@@ -1,0 +1,8 @@
+{
+  "name": "release-watcher-tooling",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "agentic-project-kit": "github:HaidaDaniel/AgenticProjectKit#v0.5.2"
+  }
+}
