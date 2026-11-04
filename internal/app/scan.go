@@ -136,6 +136,10 @@ func (s *Service) scanOne(ctx context.Context, watch domain.Watch) (int, string,
 		if loadErr != nil {
 			return loadErr
 		}
+		if fresh.watch.RemovedAt != nil {
+			outcome = "skipped"
+			return nil
+		}
 		releases, listErr := q.ListReleasesByPublication(ctx, fresh.publication.ID, true, 20000)
 		if listErr != nil {
 			return listErr

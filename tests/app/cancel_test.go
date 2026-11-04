@@ -8,6 +8,7 @@ import (
 
 	"github.com/HaidaDaniel/release-watcher/internal/app"
 	"github.com/HaidaDaniel/release-watcher/internal/domain"
+	"github.com/HaidaDaniel/release-watcher/internal/lock"
 	"github.com/HaidaDaniel/release-watcher/internal/store"
 )
 
@@ -198,5 +199,28 @@ func TestRemoveCancelsOnlyOwnDeliveries(t *testing.T) {
 		if status != domain.DeliverySent {
 			t.Fatalf("other watch delivery %s = %s", eventID, status)
 		}
+	}
+}
+
+func TestRemoveAndPurgeUseScanLock(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	added := addNaro(t, env, nil)
+
+	release, err := lock.Acquire(ctx, env.cfg.LockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, appErr := env.svc.Remove(ctx, added.WatchID); appErr == nil || appErr.Code != "locked" {
+		t.Fatalf("remove with held lock = %+v", appErr)
+	}
+	if _, appErr := env.svc.Purge(ctx, added.WatchID); appErr == nil || appErr.Code != "locked" {
+		t.Fatalf("purge with held lock = %+v", appErr)
+	}
+	release()
+
+	if _, appErr := env.svc.Remove(ctx, added.WatchID); appErr != nil {
+		t.Fatalf("remove after release = %+v", appErr)
 	}
 }

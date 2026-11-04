@@ -355,6 +355,9 @@ func (r *runner) remove(ctx context.Context, args []string) int {
 		return ExitOK
 	}
 	fmt.Fprintf(r.stdout, "%s %s (%s)\n", r.t("Наблюдение остановлено", "Stopped watching"), result.WatchID, r.t("история сохранена", "history preserved"))
+	if result.CanceledDeliveries > 0 {
+		fmt.Fprintf(r.stdout, "%s: %d\n", r.t("Отменено уведомлений", "Canceled notifications"), result.CanceledDeliveries)
+	}
 	return ExitOK
 }
 

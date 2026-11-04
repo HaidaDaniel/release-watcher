@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/HaidaDaniel/release-watcher/internal/lock"
 	"github.com/HaidaDaniel/release-watcher/internal/store"
 )
 
@@ -99,6 +100,11 @@ func (s *Service) SetInterval(ctx context.Context, watchID string, interval time
 }
 
 func (s *Service) Remove(ctx context.Context, watchID string) (*RemoveResult, *Error) {
+	release, err := lock.Acquire(ctx, s.cfg.LockPath)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer release()
 	q := s.store.Queries()
 	watch, err := q.GetWatch(ctx, watchID)
 	if err != nil {
@@ -126,6 +132,11 @@ func (s *Service) Remove(ctx context.Context, watchID string) (*RemoveResult, *E
 }
 
 func (s *Service) Purge(ctx context.Context, watchID string) (*PurgeResult, *Error) {
+	release, err := lock.Acquire(ctx, s.cfg.LockPath)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer release()
 	q := s.store.Queries()
 	watch, err := q.GetWatch(ctx, watchID)
 	if err != nil {

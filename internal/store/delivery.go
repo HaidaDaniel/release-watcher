@@ -91,7 +91,10 @@ func (q *Queries) MarkDeliverySent(ctx context.Context, id string, now time.Time
 	if err != nil {
 		return fmt.Errorf("store: mark delivery sent: %w", err)
 	}
-	return expectOne(res)
+	if _, err := res.RowsAffected(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (q *Queries) MarkDeliveryFailed(ctx context.Context, id string, nextAttempt time.Time, lastError string, now time.Time) error {
@@ -103,7 +106,10 @@ func (q *Queries) MarkDeliveryFailed(ctx context.Context, id string, nextAttempt
 	if err != nil {
 		return fmt.Errorf("store: mark delivery failed: %w", err)
 	}
-	return expectOne(res)
+	if _, err := res.RowsAffected(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // CancelPendingDeliveriesForWatch turns pending and failed deliveries for one
