@@ -556,14 +556,20 @@ func calendarCadence(value string) (time.Duration, bool) {
 	fields := strings.Fields(value)
 	weekly := false
 	if len(fields) > 0 && isWeekdayExpression(fields[0]) {
-		weekly = !strings.Contains(fields[0], "..")
+		if strings.Contains(fields[0], "..") || strings.Contains(fields[0], ",") {
+			return 0, false
+		}
+		weekly = true
 		fields = fields[1:]
 	}
-	if len(fields) == 0 {
+	if len(fields) < 2 || fields[0] != "*-*-*" {
 		return 0, false
 	}
 	clock := fields[len(fields)-1]
-	if weekly && !strings.Contains(clock, "/") {
+	if weekly {
+		if strings.Contains(clock, "/") {
+			return 0, false
+		}
 		return 7 * 24 * time.Hour, true
 	}
 	parts := strings.Split(clock, ":")

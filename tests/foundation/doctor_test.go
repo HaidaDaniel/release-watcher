@@ -163,6 +163,9 @@ func TestDoctorScheduleCadenceParsing(t *testing.T) {
 		{name: "hourly", unit: "OnCalendar=hourly", want: "ok", message: "1h"},
 		{name: "five minute step", unit: "OnCalendar=*-*-* *:0/5:00", want: "ok", message: "5m"},
 		{name: "weekly", unit: "OnCalendar=Mon *-*-* 04:15:00", want: "warn", message: "168h"},
+		{name: "weekday range is conservative", unit: "OnCalendar=Mon..Fri *-*-* 04:15:00", want: "warn", message: "cannot determine"},
+		{name: "weekday with step is conservative", unit: "OnCalendar=Mon *-*-* 00/6:00:00", want: "warn", message: "cannot determine"},
+		{name: "monthly date is conservative", unit: "OnCalendar=*-*-01 04:15:00", want: "warn", message: "cannot determine"},
 		{name: "drop-in six hour", unit: "OnCalendar=*-*-* 04:15:00", dropIn: "OnCalendar=*-*-* 00/6:00:00", want: "ok", message: "6h"},
 	}
 	for _, tc := range cases {
