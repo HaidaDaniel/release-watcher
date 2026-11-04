@@ -295,7 +295,7 @@ Messages are grouped per event (a multi-chapter event becomes one message), use 
 
 ## `doctor`, `backup`, `restore`
 
-- `doctor --json` is implemented as a read-only configuration/environment check and returns `{"healthy":true|false,"checks":[{"id":"...","status":"ok|warn|error","message":"..."}]}`. It does not migrate and includes a read-only schema-version and database-permission probe.
+- `doctor --json` is implemented as a read-only configuration/environment check and returns `{"healthy":true|false,"checks":[{"id":"...","status":"ok|warn|error","message":"..."}]}`. It does not migrate and includes a read-only schema-version and database-permission probe. On a closed database it does not create WAL sidecars; if a writer is active, stop it for an authoritative check.
 - `backup --out <path> [--force] --json` returns `{"path":"...","schema_version":N,"bytes":N,"created_at":"..."}`. The archive contains `manifest.json` (format, schema, app version, SHA-256, size) and `release-watcher.db`.
 - `restore --in <path> --force --json` validates format, size, hash and schema compatibility, acquires the scan/notify lock and replaces the database. It returns `{"path":"...","schema_version":N,"bytes":N}`. It refuses a newer schema and requires `--force` when a database exists.
 

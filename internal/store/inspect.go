@@ -32,6 +32,9 @@ func InspectSchema(ctx context.Context, path string) (int, error) {
 	q := u.Query()
 	q.Set("mode", "ro")
 	q.Add("_pragma", "query_only(1)")
+	if _, err := os.Stat(abs + "-wal"); os.IsNotExist(err) {
+		q.Set("immutable", "1")
+	}
 	u.RawQuery = q.Encode()
 	db, err := sql.Open("sqlite", u.String())
 	if err != nil {

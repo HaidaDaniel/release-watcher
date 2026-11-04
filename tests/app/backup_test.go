@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/HaidaDaniel/release-watcher/internal/app"
@@ -235,4 +236,55 @@ func TestBackupPermissionsAndLock(t *testing.T) {
 		t.Fatalf("restore with held lock = %+v", appErr)
 	}
 	release()
+}
+
+func TestRestoreRejectsMismatchedOrShortHashAndEmptySchema(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	_ = addNaro(t, env, nil)
+	valid := filepath.Join(t.TempDir(), "valid.rwbackup")
+	if _, appErr := env.svc.Backup(ctx, valid, false); appErr != nil {
+		t.Fatal(appErr)
+	}
+	dbData := readBackupDB(t, valid)
+	cases := map[string]map[string]any{
+		"short-hash": {
+			"format": "release-watcher-backup", "format_version": 1,
+			"schema_version": 1, "database_sha256": "abc", "database_bytes": len(dbData),
+		},
+		"mismatched-hash": {
+			"format": "release-watcher-backup", "format_version": 1,
+			"schema_version": 1, "database_sha256": strings.Repeat("0", 64), "database_bytes": len(dbData),
+		},
+	}
+	for name, manifest := range cases {
+		path := filepath.Join(t.TempDir(), name+".rwbackup")
+		writeBackupArchiveWithManifest(t, path, manifest, dbData)
+		if _, appErr := app.Restore(ctx, env.cfg, path, true); appErr == nil || appErr.Code != "invalid_backup" {
+			t.Fatalf("%s restore = %+v", name, appErr)
+		}
+	}
+
+	emptySchemaPath := filepath.Join(t.TempDir(), "empty.db")
+	db, err := sql.Open("sqlite", "file:"+emptySchemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	emptyData, err := os.ReadFile(emptySchemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(t.TempDir(), "empty-schema.rwbackup")
+	writeBackupArchiveWithManifest(t, archive, map[string]any{
+		"format": "release-watcher-backup", "format_version": 1,
+		"schema_version": 0, "database_sha256": sha256Hex(emptyData), "database_bytes": len(emptyData),
+	}, emptyData)
+	if _, appErr := app.Restore(ctx, env.cfg, archive, true); appErr == nil || appErr.Code != "invalid_backup" {
+		t.Fatalf("empty schema restore = %+v", appErr)
+	}
 }

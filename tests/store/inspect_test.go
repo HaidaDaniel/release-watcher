@@ -59,3 +59,28 @@ func TestInspectSchemaAndVacuumInto(t *testing.T) {
 		t.Fatal("missing database inspected without error")
 	}
 }
+
+func TestInspectSchemaDoesNotCreateSidecars(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "closed.db")
+	st, err := store.Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, suffix := range []string{"-wal", "-shm"} {
+		_ = os.Remove(path + suffix)
+	}
+	version, err := store.InspectSchema(ctx, path)
+	if err != nil || version != 1 {
+		t.Fatalf("inspect = %d err=%v", version, err)
+	}
+	for _, suffix := range []string{"-wal", "-shm"} {
+		if _, err := os.Stat(path + suffix); !os.IsNotExist(err) {
+			t.Fatalf("inspect created sidecar %s", suffix)
+		}
+	}
+}

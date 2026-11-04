@@ -28,7 +28,7 @@ release-watcher doctor --json
 systemctl --user list-timers release-watcher.timer
 ```
 
-`scripts/install.sh` installs the binary to `~/.local/bin`, the user service/timer to `$XDG_CONFIG_HOME/systemd/user` (normally `~/.config/systemd/user`), creates a private `~/.config/release-watcher/env` template, reloads the user manager and optionally enables the timer. Set `PREFIX` to install elsewhere. Without `--enable`, enable it manually:
+`scripts/install.sh` installs the binary to `~/.local/bin`, the user service/timer to `$XDG_CONFIG_HOME/systemd/user` (normally `~/.config/systemd/user`), creates a private `~/.config/release-watcher/env` template, reloads the user manager and optionally enables the timer. Set `PREFIX` to install elsewhere and `XDG_DATA_HOME`/`RELEASE_WATCHER_STATE_DIR` to control the rendered state path. The installer renders the actual binary, env-file and state paths into the service rather than copying placeholders. Without `--enable`, enable it manually:
 
 ```sh
 systemctl --user enable --now release-watcher.timer
@@ -82,7 +82,7 @@ Restore acquires the same process lock as scans/notify, validates the archive, s
 
 ## Doctor
 
-`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings and build identity. It does not create or migrate the database.
+`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings and build identity. It does not create or migrate the database. On a closed database it opens with `immutable=1`, so it does not create `-wal`/`-shm` sidecars; if a live WAL exists it reads that WAL. Stop writers when an authoritative schema/permission check is required.
 
 ## Local verification evidence
 

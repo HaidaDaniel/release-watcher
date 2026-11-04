@@ -252,24 +252,29 @@ func Restore(ctx context.Context, cfg config.Config, in string, force bool) (*Re
 		if err := os.Rename(cfg.DBPath, oldPath); err != nil {
 			return nil, newError("storage_error", "cannot move the current database aside", err)
 		}
-		moveIfExists(cfg.DBPath+"-wal", oldPath+"-wal")
-		moveIfExists(cfg.DBPath+"-shm", oldPath+"-shm")
+		if err := moveSidecars(cfg.DBPath, oldPath); err != nil {
+			_ = os.Rename(oldPath, cfg.DBPath)
+			_ = moveSidecars(oldPath, cfg.DBPath)
+			return nil, newError("storage_error", "cannot move database sidecars aside", err)
+		}
 	}
-	_ = os.Remove(cfg.DBPath + "-wal")
-	_ = os.Remove(cfg.DBPath + "-shm")
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		_ = os.Remove(cfg.DBPath + suffix)
+	}
 	if err := os.Rename(tmpDB, cfg.DBPath); err != nil {
 		if hadExisting {
 			_ = os.Rename(oldPath, cfg.DBPath)
-			moveIfExists(oldPath+"-wal", cfg.DBPath+"-wal")
-			moveIfExists(oldPath+"-shm", cfg.DBPath+"-shm")
+			_ = moveSidecars(oldPath, cfg.DBPath)
 		}
 		return nil, newError("storage_error", "cannot install restored database", err)
 	}
-	_ = os.Remove(cfg.DBPath + "-wal")
-	_ = os.Remove(cfg.DBPath + "-shm")
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		_ = os.Remove(cfg.DBPath + suffix)
+	}
 	if hadExisting {
-		_ = os.Remove(oldPath + "-wal")
-		_ = os.Remove(oldPath + "-shm")
+		for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+			_ = os.Remove(oldPath + suffix)
+		}
 		_ = os.Remove(oldPath)
 	}
 	return &RestoreResult{Path: cfg.DBPath, SchemaVersion: version, Bytes: written}, nil
@@ -284,8 +289,18 @@ func firstError(errors ...error) error {
 	return nil
 }
 
-func moveIfExists(src, dst string) {
-	if _, err := os.Stat(src); err == nil {
-		_ = os.Rename(src, dst)
+func moveSidecars(fromBase, toBase string) error {
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		src := fromBase + suffix
+		if _, err := os.Stat(src); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if err := os.Rename(src, toBase+suffix); err != nil {
+			return err
+		}
 	}
+	return nil
 }

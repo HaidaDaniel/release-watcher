@@ -6,9 +6,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-Environment=RELEASE_WATCHER_STATE_DIR=%h/.local/share/release-watcher
-EnvironmentFile=-%h/.config/release-watcher/env
-ExecStart=%h/.local/bin/release-watcher scan --due --json
+Environment="RELEASE_WATCHER_STATE_DIR=%h/.local/share/release-watcher"
+EnvironmentFile=-"%h/.config/release-watcher/env"
+ExecStart="%h/.local/bin/release-watcher" scan --due --json
 Nice=10
 IOSchedulingClass=idle
 TimeoutStartSec=30min

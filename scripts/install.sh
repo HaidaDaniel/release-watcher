@@ -33,13 +33,18 @@ fi
 
 unit_dir="$config_home/systemd/user"
 env_dir="$config_home/release-watcher"
-state_dir=${RELEASE_WATCHER_STATE_DIR:-$HOME/.local/share/release-watcher}
+data_home=${XDG_DATA_HOME:-$HOME/.local/share}
+state_dir=${RELEASE_WATCHER_STATE_DIR:-$data_home/release-watcher}
+escape_sed() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
+prefix_esc=$(escape_sed "$prefix")
+env_esc=$(escape_sed "$env_dir")
+state_esc=$(escape_sed "$state_dir")
 install -Dm0755 "$binary" "$prefix/bin/release-watcher"
 mkdir -p "$unit_dir"
 sed \
-  -e "s|%h/.local/bin/release-watcher|$prefix/bin/release-watcher|g" \
-  -e "s|%h/.config/release-watcher/env|$env_dir/env|g" \
-  -e "s|%h/.local/share/release-watcher|$state_dir|g" \
+  -e "s|%h/.local/bin/release-watcher|$prefix_esc/bin/release-watcher|g" \
+  -e "s|%h/.config/release-watcher/env|$env_esc/env|g" \
+  -e "s|%h/.local/share/release-watcher|$state_esc|g" \
   "$repo/deploy/systemd/release-watcher.service" > "$unit_dir/release-watcher.service"
 chmod 0644 "$unit_dir/release-watcher.service"
 install -Dm0644 "$repo/deploy/systemd/release-watcher.timer" "$unit_dir/release-watcher.timer"
