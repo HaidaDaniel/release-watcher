@@ -1,6 +1,6 @@
 # Task 0015 - Live source acceptance and end-to-end regression
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: verification
