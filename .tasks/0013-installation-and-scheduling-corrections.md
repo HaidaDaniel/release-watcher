@@ -35,6 +35,7 @@ Make the default user-level schedule one run per day with Persistent=true, keep 
 - tests/foundation/**
 - docs/deployment.md
 - docs/architecture.md
+- docs/decisions.md
 - docs/progress.md
 - README.md
 - .tasks/**
@@ -70,6 +71,7 @@ Make the default user-level schedule one run per day with Persistent=true, keep 
 
 - docs/deployment.md
 - docs/architecture.md
+- docs/decisions.md
 - docs/progress.md
 - README.md
 
