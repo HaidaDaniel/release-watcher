@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -28,6 +29,29 @@ func InspectSchema(ctx context.Context, path string) (int, error) {
 	if _, err := os.Stat(abs); err != nil {
 		return 0, err
 	}
+	if _, err := os.Stat(abs + "-wal"); err == nil {
+		tmpDir, err := os.MkdirTemp("", "release-watcher-inspect-*")
+		if err != nil {
+			return 0, fmt.Errorf("store: create inspection directory: %w", err)
+		}
+		defer os.RemoveAll(tmpDir)
+		tmpDB := filepath.Join(tmpDir, "inspect.db")
+		if err := copyFile(abs, tmpDB); err != nil {
+			return 0, fmt.Errorf("store: copy database for inspection: %w", err)
+		}
+		for _, suffix := range []string{"-wal", "-shm"} {
+			if _, statErr := os.Stat(abs + suffix); statErr == nil {
+				if err := copyFile(abs+suffix, tmpDB+suffix); err != nil {
+					return 0, fmt.Errorf("store: copy database sidecar for inspection: %w", err)
+				}
+			}
+		}
+		return inspectPath(ctx, tmpDB)
+	}
+	return inspectPath(ctx, abs)
+}
+
+func inspectPath(ctx context.Context, abs string) (int, error) {
 	u := url.URL{Scheme: "file", Path: abs}
 	q := u.Query()
 	q.Set("mode", "ro")
@@ -60,6 +84,27 @@ func InspectSchema(ctx context.Context, path string) (int, error) {
 		return 0, fmt.Errorf("store: read schema version: %w", err)
 	}
 	return version, nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := in.Seek(0, 0); err != nil {
+		_ = out.Close()
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 // KnownSchemaVersion returns the highest migration embedded in this binary.

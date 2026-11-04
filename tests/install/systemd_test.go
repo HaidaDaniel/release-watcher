@@ -28,7 +28,7 @@ func TestSystemdUnitsAndInstallScript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"scan --due", "EnvironmentFile=-\"%h/.config/release-watcher/env\"", "TimeoutStartSec=30min"} {
+	for _, want := range []string{"scan --due", "EnvironmentFile=-%h/.config/release-watcher/env", "TimeoutStartSec=30min"} {
 		if !strings.Contains(string(service), want) {
 			t.Fatalf("service missing %q", want)
 		}
@@ -72,8 +72,12 @@ func TestSystemdUnitsAndInstallScript(t *testing.T) {
 			filepath.Join(tmp, "release-watcher.service"),
 			filepath.Join(tmp, "release-watcher.timer"),
 		)
-		if output, err := cmd.CombinedOutput(); err != nil {
+		output, err := cmd.CombinedOutput()
+		if err != nil {
 			t.Fatalf("systemd-analyze verify: %v\n%s", err, output)
+		}
+		if strings.Contains(string(output), "ignoring:") {
+			t.Fatalf("systemd-analyze warnings:\n%s", output)
 		}
 	}
 }
@@ -103,8 +107,8 @@ func TestInstallScriptRendersCustomPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"ExecStart=\"" + filepath.Join(prefix, "bin", "release-watcher") + "\" scan --due --json",
-		"EnvironmentFile=-\"" + filepath.Join(configHome, "release-watcher", "env") + "\"",
+		"ExecStart=\"" + filepath.Join(strings.ReplaceAll(prefix, "%", "%%"), "bin", "release-watcher") + "\" scan --due --json",
+		"EnvironmentFile=-" + filepath.Join(configHome, "release-watcher", "env"),
 		"Environment=\"RELEASE_WATCHER_STATE_DIR=" + stateDir + "\"",
 	} {
 		if !strings.Contains(string(service), want) {
@@ -122,7 +126,7 @@ func TestInstallScriptRendersCustomPaths(t *testing.T) {
 func TestInstallScriptHonorsXDGDataAndSpecialPaths(t *testing.T) {
 	root := repoRoot(t)
 	tmp := t.TempDir()
-	prefix := filepath.Join(tmp, "pre fix&|x")
+	prefix := filepath.Join(tmp, "pre fix&|%x")
 	configHome := filepath.Join(tmp, "config")
 	dataHome := filepath.Join(tmp, "xdg data")
 	fakeBin := filepath.Join(tmp, "fake release-watcher")
@@ -145,8 +149,8 @@ func TestInstallScriptHonorsXDGDataAndSpecialPaths(t *testing.T) {
 	}
 	text := string(service)
 	for _, want := range []string{
-		"ExecStart=\"" + filepath.Join(prefix, "bin", "release-watcher") + "\" scan --due --json",
-		"Environment=\"RELEASE_WATCHER_STATE_DIR=" + filepath.Join(dataHome, "release-watcher") + "\"",
+		"ExecStart=\"" + filepath.Join(strings.ReplaceAll(prefix, "%", "%%"), "bin", "release-watcher") + "\" scan --due --json",
+		"Environment=\"RELEASE_WATCHER_STATE_DIR=" + filepath.Join(strings.ReplaceAll(dataHome, "%", "%%"), "release-watcher") + "\"",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered service missing %q:\n%s", want, text)

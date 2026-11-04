@@ -35,10 +35,11 @@ unit_dir="$config_home/systemd/user"
 env_dir="$config_home/release-watcher"
 data_home=${XDG_DATA_HOME:-$HOME/.local/share}
 state_dir=${RELEASE_WATCHER_STATE_DIR:-$data_home/release-watcher}
+escape_for_unit() { printf '%s' "$1" | sed -e 's/%/%%/g'; }
 escape_sed() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
-prefix_esc=$(escape_sed "$prefix")
-env_esc=$(escape_sed "$env_dir")
-state_esc=$(escape_sed "$state_dir")
+prefix_esc=$(escape_sed "$(escape_for_unit "$prefix")")
+env_esc=$(escape_sed "$(escape_for_unit "$env_dir")")
+state_esc=$(escape_sed "$(escape_for_unit "$state_dir")")
 install -Dm0755 "$binary" "$prefix/bin/release-watcher"
 mkdir -p "$unit_dir"
 sed \
@@ -71,7 +72,7 @@ fi
 
 echo "Installed: $prefix/bin/release-watcher"
 echo "Units:     $unit_dir/release-watcher.service, $unit_dir/release-watcher.timer"
-echo "State:     ${RELEASE_WATCHER_STATE_DIR:-$HOME/.local/share/release-watcher}"
+echo "State:     $state_dir"
 if ! $enable; then
   echo "Next:      systemctl --user enable --now release-watcher.timer"
 fi

@@ -84,3 +84,36 @@ func TestInspectSchemaDoesNotCreateSidecars(t *testing.T) {
 		}
 	}
 }
+
+func TestInspectSchemaWithLiveWALDoesNotModifySourceSidecars(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "live.db")
+	st, err := store.Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.Queries().SetSetting(ctx, "k", "v", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	before := map[string]os.FileInfo{}
+	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
+		if info, err := os.Stat(candidate); err == nil {
+			before[candidate] = info
+		}
+	}
+	version, err := store.InspectSchema(ctx, path)
+	if err != nil || version != 1 {
+		t.Fatalf("inspect live = %d err=%v", version, err)
+	}
+	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
+		if info, err := os.Stat(candidate); err == nil {
+			if old, ok := before[candidate]; !ok || old.Size() != info.Size() {
+				t.Fatalf("source sidecar changed by inspect: %s", candidate)
+			}
+		} else if _, ok := before[candidate]; ok {
+			t.Fatalf("source sidecar removed by inspect: %s", candidate)
+		}
+	}
+}

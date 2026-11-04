@@ -288,3 +288,49 @@ func TestRestoreRejectsMismatchedOrShortHashAndEmptySchema(t *testing.T) {
 		t.Fatalf("empty schema restore = %+v", appErr)
 	}
 }
+
+func TestBackupRejectsLiveDatabaseTarget(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	_ = addNaro(t, env, nil)
+	for _, target := range []string{env.cfg.DBPath, env.cfg.DBPath + "-wal", env.cfg.LockPath} {
+		if _, appErr := env.svc.Backup(ctx, target, true); appErr == nil || appErr.Code != "invalid_argument" {
+			t.Fatalf("backup target %s = %+v", target, appErr)
+		}
+	}
+	if _, appErr := env.svc.List(ctx); appErr != nil {
+		t.Fatalf("database damaged after rejected backup: %+v", appErr)
+	}
+}
+
+func TestRestoreCleansSidecarsAndOldDatabase(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	_ = addNaro(t, env, nil)
+	archive := filepath.Join(t.TempDir(), "state.rwbackup")
+	if _, appErr := env.svc.Backup(ctx, archive, false); appErr != nil {
+		t.Fatal(appErr)
+	}
+	if err := env.store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		if err := os.WriteFile(env.cfg.DBPath+suffix, []byte("stale sidecar"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, appErr := app.Restore(ctx, env.cfg, archive, true); appErr != nil {
+		t.Fatal(appErr)
+	}
+	for _, suffix := range []string{"-wal", "-shm", "-journal", ".pre-restore", ".pre-restore-wal", ".pre-restore-shm", ".pre-restore-journal"} {
+		if _, err := os.Stat(env.cfg.DBPath + suffix); !os.IsNotExist(err) {
+			t.Fatalf("stale file remains: %s", env.cfg.DBPath+suffix)
+		}
+	}
+	reopened := openServiceForConfig(t, env.cfg, n)
+	if _, appErr := reopened.svc.List(ctx); appErr != nil {
+		t.Fatalf("database unreadable after restore: %+v", appErr)
+	}
+}

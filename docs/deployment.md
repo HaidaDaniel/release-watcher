@@ -82,7 +82,7 @@ Restore acquires the same process lock as scans/notify, validates the archive, s
 
 ## Doctor
 
-`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings and build identity. It does not create or migrate the database. On a closed database it opens with `immutable=1`, so it does not create `-wal`/`-shm` sidecars; if a live WAL exists it reads that WAL. Stop writers when an authoritative schema/permission check is required.
+`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings and build identity. It does not create or migrate the database. On a closed database it opens with `immutable=1`, so it does not create `-wal`/`-shm` sidecars; if a WAL exists it inspects a temporary copy, leaving the live files untouched. Stop writers when an authoritative schema/permission check is required.
 
 ## Local verification evidence
 
@@ -90,7 +90,7 @@ The installation task verified:
 
 - `scripts/build.sh --all` produced linux/amd64 and linux/arm64 binaries; `file` reports a statically linked ARM64 ELF.
 - The amd64 binary reports honest build identity with `version --json` and doctor parses configuration without a database.
-- `systemd-analyze verify` accepted the service and timer with a temporary executable path.
+- `systemd-analyze verify` accepted the service and timer with a temporary executable path, including the rendered `EnvironmentFile` without quoting warnings.
 - The install script and build script pass `bash -n`.
 - Backup/restore and doctor are covered by tests at application and CLI levels.
 

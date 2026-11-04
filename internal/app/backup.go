@@ -56,6 +56,23 @@ func (s *Service) Backup(ctx context.Context, out string, force bool) (*BackupRe
 	}
 	defer release()
 
+	outAbs, absErr := filepath.Abs(out)
+	if absErr != nil {
+		return nil, newError("invalid_argument", "cannot resolve backup output path", absErr)
+	}
+	dbAbs, _ := filepath.Abs(s.store.Path())
+	lockAbs, _ := filepath.Abs(s.cfg.LockPath)
+	dangerous := map[string]bool{
+		filepath.Clean(dbAbs):              true,
+		filepath.Clean(dbAbs + "-wal"):     true,
+		filepath.Clean(dbAbs + "-shm"):     true,
+		filepath.Clean(dbAbs + "-journal"): true,
+		filepath.Clean(lockAbs):            true,
+	}
+	if dangerous[filepath.Clean(outAbs)] {
+		return nil, newError("invalid_argument", "backup output must not be the live database, a sidecar, or the scan lock", nil)
+	}
+
 	if _, statErr := os.Stat(out); statErr == nil && !force {
 		return nil, newError("already_exists", "backup target already exists; pass --force to replace it", nil)
 	} else if statErr != nil && !os.IsNotExist(statErr) {
