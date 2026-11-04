@@ -44,7 +44,7 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Date: 2026-11-04
 - Status: Accepted and implemented by task 0006
 - Decision: `NotificationDelivery` rows provide a pending/sent/failed outbox with attempts and retry times. Telegram is one optional channel configured only through environment variables. A missing token does not create delivery rows and never blocks event storage. Secrets are never logged or stored in SQLite. Multiple new chapters are grouped into one message per event/publication.
-- Consequences: Delivery failures are recoverable and deduplicated. The CLI and JSON event stream remain the primary interface.
+- Consequences: Delivery failures are recoverable and deduplicated. Status-code classification happens before body parsing, so proxy/CDN 5xx or 429 pages still retry. `scan --no-notify` reports pending outbox counts without sending. The CLI and JSON event stream remain the primary interface.
 
 ## ADR-0007 — SSRF-safe HTTP client
 

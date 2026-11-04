@@ -324,7 +324,7 @@ func TestCLINotifyAndNoNotify(t *testing.T) {
 	}
 	scanData := dataMap(t, decodeEnvelope(t, stdout))
 	notifications := scanData["notifications"].(map[string]any)
-	if notifications["sent"] != float64(0) {
+	if notifications["sent"] != float64(0) || notifications["pending"] != float64(1) {
 		t.Fatalf("notifications = %v", notifications)
 	}
 

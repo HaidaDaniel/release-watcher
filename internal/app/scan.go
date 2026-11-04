@@ -80,12 +80,14 @@ func (s *Service) Scan(ctx context.Context, opts ScanOptions) (*ScanResult, *Err
 	}
 	result.FinishedAt = s.now()
 	if !opts.NoNotify && s.notifier != nil {
-		counts, flushErr := s.FlushDeliveries(ctx)
-		if flushErr != nil {
+		if _, flushErr := s.FlushDeliveries(ctx); flushErr != nil {
 			s.logger.Error("notification flush failed", "error", flushErr.Message)
-		} else {
-			result.Notifications = counts
 		}
+	}
+	if counts, countErr := s.DeliveryCounts(ctx); countErr == nil {
+		result.Notifications = counts
+	} else {
+		s.logger.Error("cannot read notification counts", "error", countErr.Message)
 	}
 	return result, nil
 }

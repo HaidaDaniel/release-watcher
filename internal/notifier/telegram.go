@@ -74,26 +74,29 @@ func (t *Telegram) Send(ctx context.Context, text string) error {
 		} `json:"parameters"`
 	}
 	parseErr := json.Unmarshal(body, &payload)
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 && parseErr == nil && payload.OK {
-		return nil
-	}
-	if parseErr != nil {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		if parseErr == nil && payload.OK {
+			return nil
+		}
 		return &Error{Code: CodeTelegramInvalid, Message: fmt.Sprintf("Telegram returned HTTP %d with an invalid body", resp.StatusCode), StatusCode: resp.StatusCode}
 	}
-	message := "Telegram rejected the notification"
-	if payload.Description != "" {
+	message := fmt.Sprintf("Telegram returned HTTP %d", resp.StatusCode)
+	if parseErr == nil && payload.Description != "" {
 		message = fmt.Sprintf("Telegram error %d: %s", payload.ErrorCode, payload.Description)
 	}
 	switch {
 	case resp.StatusCode == http.StatusTooManyRequests:
+		retryAfter := time.Duration(0)
+		if parseErr == nil {
+			retryAfter = time.Duration(payload.Parameters.RetryAfter) * time.Second
+		}
 		return &Error{
 			Code: CodeTelegramRateLimited, Message: message, Retryable: true,
-			RetryAfter: time.Duration(payload.Parameters.RetryAfter) * time.Second,
-			StatusCode: resp.StatusCode,
+			RetryAfter: retryAfter, StatusCode: resp.StatusCode,
 		}
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
 		return &Error{Code: CodeTelegramForbidden, Message: message, StatusCode: resp.StatusCode}
-	case resp.StatusCode >= 500:
+	case resp.StatusCode >= 500 || resp.StatusCode == http.StatusRequestTimeout:
 		return &Error{Code: CodeTelegramServer, Message: message, Retryable: true, StatusCode: resp.StatusCode}
 	default:
 		return &Error{Code: CodeTelegramBadRequest, Message: message, StatusCode: resp.StatusCode}

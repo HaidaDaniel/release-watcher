@@ -25,7 +25,7 @@ func (s *Service) Notify(ctx context.Context) (NotificationCounts, *Error) {
 // current outbox counts. Events remain stored regardless of delivery outcome.
 func (s *Service) FlushDeliveries(ctx context.Context) (NotificationCounts, *Error) {
 	if s.notifier == nil {
-		return NotificationCounts{}, nil
+		return s.DeliveryCounts(ctx)
 	}
 	q := s.store.Queries()
 	now := s.now()
@@ -65,7 +65,12 @@ func (s *Service) FlushDeliveries(ctx context.Context) (NotificationCounts, *Err
 			return NotificationCounts{}, mapError(err)
 		}
 	}
-	counts, err := q.CountDeliveriesByStatus(ctx)
+	return s.DeliveryCounts(ctx)
+}
+
+// DeliveryCounts returns current outbox counts without sending anything.
+func (s *Service) DeliveryCounts(ctx context.Context) (NotificationCounts, *Error) {
+	counts, err := s.store.Queries().CountDeliveriesByStatus(ctx)
 	if err != nil {
 		return NotificationCounts{}, mapError(err)
 	}
@@ -83,9 +88,12 @@ func deliveryBackoff(attempts int, retryAfter time.Duration) time.Duration {
 	if attempts < 1 {
 		attempts = 1
 	}
-	delay := time.Minute << (attempts - 1)
-	if delay > 6*time.Hour {
-		delay = 6 * time.Hour
+	delay := time.Minute
+	for i := 1; i < attempts && delay < 6*time.Hour; i++ {
+		delay *= 2
+		if delay > 6*time.Hour {
+			delay = 6 * time.Hour
+		}
 	}
 	return delay
 }

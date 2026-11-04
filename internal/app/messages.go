@@ -34,7 +34,7 @@ func FormatEvent(lang string, raw json.RawMessage) string {
 				if n == 1 {
 					text = fmt.Sprintf("«%s»: появилась новая глава%s.", title, suffix)
 				} else {
-					text = fmt.Sprintf("«%s»: появились %d %s%s.", title, n, ruChapterWord(n), suffix)
+					text = fmt.Sprintf("«%s»: %s %d %s%s.", title, ruChapterVerb(n), n, ruChapterWord(n), suffix)
 				}
 			}
 		} else if event.CurrentCount != nil {
@@ -73,15 +73,15 @@ func FormatEvent(lang string, raw json.RawMessage) string {
 			text = fmt.Sprintf("«%s»: обновились метаданные публикации.", title)
 		}
 		if event.MetadataChanges != nil {
-			titleLabel, statusLabel := "название", "статус"
+			titleLabel, statusLabel := "Название", "Статус"
 			if lang == "en" {
-				titleLabel, statusLabel = "title", "status"
+				titleLabel, statusLabel = "Title", "Status"
 			}
 			if event.MetadataChanges.NewOriginalTitle != nil {
-				text = strings.TrimSuffix(text, ".") + fmt.Sprintf(" %s: %s.", titleLabel, *event.MetadataChanges.NewOriginalTitle)
+				text += fmt.Sprintf(" %s: %s.", titleLabel, *event.MetadataChanges.NewOriginalTitle)
 			}
 			if event.MetadataChanges.NewStatus != nil {
-				text = strings.TrimSuffix(text, ".") + fmt.Sprintf(" %s: %s.", statusLabel, statusMessage(lang, *event.MetadataChanges.NewStatus))
+				text += fmt.Sprintf(" %s: %s.", statusLabel, statusMessage(lang, *event.MetadataChanges.NewStatus))
 			}
 		}
 	case "publication.status_changed":
@@ -161,6 +161,16 @@ func statusMessage(lang, status string) string {
 	default:
 		return status
 	}
+}
+
+func ruChapterVerb(n int) string {
+	if n%100 >= 11 && n%100 <= 14 {
+		return "появились"
+	}
+	if n%10 == 1 {
+		return "появилась"
+	}
+	return "появились"
 }
 
 func ruChapterWord(n int) string {

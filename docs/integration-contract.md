@@ -176,7 +176,7 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
 
 ## `scan`
 
-Input: `scan [--due|--all|--id <watch-id>] [--no-notify] [--json] [--log-json]`. `--no-notify` stores events and deliveries without sending them in this run; a later `notify` flushes them.
+Input: `scan [--due|--all|--id <watch-id>] [--no-notify] [--json] [--log-json]`. `--no-notify` stores events and deliveries without sending them in this run; notification counts still report the pending outbox, and a later `notify` flushes it.
 
 Success `data`:
 
@@ -289,7 +289,7 @@ Count-only events have `release_ids: []`, a non-null `previous_count`/`current_c
 
 ## `notify`
 
-`notify [--json]` flushes due deliveries and returns `{"pending":N,"sent":N,"failed":N}`. It uses the same process lock as `scan`, so a manual notify cannot race a timer scan into sending the same delivery twice. It requires Telegram configuration; without it the command returns `config_error`. Sending is bounded by `RELEASE_WATCHER_MAX_DELIVERY_ATTEMPTS`; 429 uses `retry_after`, other 5xx/network failures use backoff, and permanent 4xx failures are not retried. A delivery is unique per `(event_id, channel)`, so a repeated scan/flush never duplicates a message. Deliveries are created only for events detected while Telegram is configured; historical events are not sent retroactively. Events remain readable if every attempt fails.
+`notify [--json]` flushes due deliveries and returns `{"pending":N,"sent":N,"failed":N}`. It uses the same process lock as `scan`, so a manual notify cannot race a timer scan into sending the same delivery twice. It requires Telegram configuration; without it the command returns `config_error`. Sending is bounded by `RELEASE_WATCHER_MAX_DELIVERY_ATTEMPTS`; 429 uses `retry_after`, other 5xx/network failures use bounded exponential backoff even when the error body is not JSON, and permanent 4xx failures are not retried. A delivery is unique per `(event_id, channel)`, so a repeated scan/flush never duplicates a message. Deliveries are created only for events detected while Telegram is configured; historical events are not sent retroactively. Events remain readable if every attempt fails.
 
 Messages are grouped per event (a multi-chapter event becomes one message), use RU by default and EN with `RELEASE_WATCHER_LANG=en`, never include the bot token, and are truncated below Telegram's 4096-character limit.
 
