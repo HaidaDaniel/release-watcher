@@ -1,7 +1,7 @@
 # Task 0013 - Installation and scheduling corrections
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Type: feature
@@ -29,6 +29,7 @@ Make the default user-level schedule one run per day with Persistent=true, keep 
 - deploy/systemd/**
 - scripts/install.sh
 - internal/cli/commands.go
+- internal/cli/cli.go
 - internal/store/inspect.go
 - tests/install/**
 - tests/foundation/**
