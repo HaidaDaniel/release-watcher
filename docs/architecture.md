@@ -1,6 +1,6 @@
 # Architecture
 
-Status: the repository and CLI bootstrap are implemented. Persistence, adapters, scanning, notifications and deployment proof are planned. The target shape below is intentionally small.
+Status: the repository, CLI bootstrap and SQLite persistence (schema and repositories) are implemented. Adapters, scanning, notifications and deployment proof are planned. The target shape below is intentionally small.
 
 ## Shape
 

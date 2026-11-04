@@ -1,7 +1,7 @@
 # Task 0003 - Persistence: domain model, SQLite schema and repositories
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Scope: domain,storage,docs
@@ -58,7 +58,7 @@ Implement the minimal domain entities and a pure-Go SQLite store with append-onl
 
 ## Verification
 
-- `{"id":"push-checks","type":"automated","required":true,"environment":"local","profile":"deterministic","command":"scripts/verify-push.sh"}`
+- `{"id":"push-checks","type":"automated","required":true,"environment":"local","profile":"deterministic","command":"scripts/verify-push.sh","evidenceRef":"local scripts/verify-push.sh run"}`
 
 ## Documentation updates
 

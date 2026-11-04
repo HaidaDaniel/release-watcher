@@ -1,6 +1,6 @@
 # Domain model
 
-Status: accepted design; not yet persisted. The MVP schema follows this document.
+Status: accepted and implemented by migration 0001 and `internal/store`. Adapters and scan logic are not implemented yet.
 
 ## Entity overview
 

@@ -4,7 +4,6 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Planned
 
-- SQLite schema, repositories and migrations (task 0003).
 - HTTP/SSRF client, Narō and RSS/Atom adapters (task 0004).
 - Scan comparison, application use cases and CLI JSON (task 0005).
 - Telegram outbox and RU/EN notifications (task 0006).
@@ -21,10 +20,13 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Lefthook pre-commit/pre-push configuration and local verification scripts.
 - Linux systemd service/timer skeletons.
 - Build script for linux/amd64 and linux/arm64 with ldflags identity.
+- Domain entities and SQLite schema version 1 with Work, Source, Publication, Watch, Release, Event, NotificationDelivery, ScanRun and Setting tables.
+- Transactional repository layer with event/delivery dedupe and due-watch queries.
 
 ## Tested
 
 - Foundation CLI JSON, help localization and build identity tests: see task 0002 evidence.
+- Store tests: migrations idempotent, restart persistence, rollback, due-watch selection, event/delivery dedupe, release baseline/removal and settings: see task 0003 evidence.
 - `scripts/verify-push.sh` runs gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...` and APK lint.
 - No adapter, fixture or live Narō test exists yet; those tests belong to tasks 0004–0005.
 
@@ -40,4 +42,4 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Next step
 
-Task 0003: domain model and SQLite persistence.
+Task 0004: HTTP/SSRF client and Narō/RSS adapters.
