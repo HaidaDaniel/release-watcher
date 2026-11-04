@@ -65,8 +65,6 @@ Environment variables are read at process start. Put secrets only in a protected
 | `RELEASE_WATCHER_DB` | `<state>/release-watcher.db` | SQLite path |
 | `RELEASE_WATCHER_DEFAULT_INTERVAL` | `24h` | default watch interval |
 | `RELEASE_WATCHER_TIMEZONE` | system local | IANA timezone used for day-based scheduling and DST, for example `Europe/Berlin` |
-
-Set `RELEASE_WATCHER_TIMEZONE` to the same timezone as the systemd timer (normally system local) so the daily calendar window matches the timer.
 | `RELEASE_WATCHER_HTTP_TIMEOUT` | `30s` | per-request timeout |
 | `RELEASE_WATCHER_RATE_INTERVAL` | `1s` | minimum delay between requests to one host |
 | `RELEASE_WATCHER_MAX_RETRIES` | `3` | retries for timeouts and 429/5xx |
@@ -79,6 +77,8 @@ Set `RELEASE_WATCHER_TIMEZONE` to the same timezone as the systemd timer (normal
 | `RELEASE_WATCHER_ALLOW_PRIVATE_HOSTS` | `false` | test/dev only; weakens SSRF protection |
 | `RELEASE_WATCHER_NARO_API_BASE` | unset | test/dev only; override the Narō API base for local E2E |
 | `RELEASE_WATCHER_NARO_CATALOG_BASE` | unset | test/dev only; override the Narō catalog base for local E2E |
+
+Set `RELEASE_WATCHER_TIMEZONE` to the same timezone as the systemd timer (normally system local) so the daily calendar window matches the timer.
 
 Secrets are never logged and never stored in SQLite.
 
