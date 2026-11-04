@@ -32,7 +32,23 @@ func (q *Queries) CreatePublication(ctx context.Context, p *domain.Publication) 
 	return nil
 }
 
+const publicationColumns = `id, work_id, source_id, publication_type, original_url, status, status_source,
+	last_published_at, last_checked_at, next_check_at, release_count, created_at, updated_at`
+
 func (q *Queries) GetPublication(ctx context.Context, id string) (*domain.Publication, error) {
+	row := q.q.QueryRowContext(ctx,
+		`SELECT `+publicationColumns+` FROM publication WHERE id = ?`, id)
+	p, err := scanPublication(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: get publication: %w", err)
+	}
+	return p, nil
+}
+
+func scanPublication(row rowScanner) (*domain.Publication, error) {
 	var (
 		p                             domain.Publication
 		ptype, status                 string
@@ -41,17 +57,10 @@ func (q *Queries) GetPublication(ctx context.Context, id string) (*domain.Public
 		releaseCount                  sql.NullInt64
 		created, updated              string
 	)
-	err := q.q.QueryRowContext(ctx,
-		`SELECT id, work_id, source_id, publication_type, original_url, status, status_source,
-		        last_published_at, last_checked_at, next_check_at, release_count, created_at, updated_at
-		 FROM publication WHERE id = ?`, id,
-	).Scan(&p.ID, &p.WorkID, &p.SourceID, &ptype, &p.OriginalURL, &status, &statusSource,
+	err := row.Scan(&p.ID, &p.WorkID, &p.SourceID, &ptype, &p.OriginalURL, &status, &statusSource,
 		&lastPub, &lastCheck, &nextCheck, &releaseCount, &created, &updated)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
 	if err != nil {
-		return nil, fmt.Errorf("store: get publication: %w", err)
+		return nil, err
 	}
 	p.Type = domain.PublicationType(ptype)
 	p.Status = domain.Status(status)
@@ -92,18 +101,14 @@ func (q *Queries) GetPublicationBySourceURL(ctx context.Context, sourceID, origi
 
 func (q *Queries) ListPublications(ctx context.Context) ([]domain.Publication, error) {
 	rows, err := q.q.QueryContext(ctx,
-		`SELECT id FROM publication ORDER BY created_at ASC, id ASC`)
+		`SELECT `+publicationColumns+` FROM publication ORDER BY created_at ASC, id ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list publications: %w", err)
 	}
 	defer rows.Close()
 	var out []domain.Publication
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		p, err := q.GetPublication(ctx, id)
+		p, err := scanPublication(rows)
 		if err != nil {
 			return nil, err
 		}

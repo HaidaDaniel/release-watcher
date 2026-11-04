@@ -538,3 +538,25 @@ func TestConcurrentOpenRetries(t *testing.T) {
 		}
 	}
 }
+
+func TestListPublicationsDoesNotDeadlock(t *testing.T) {
+	s, _ := openStore(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	createFixture(t, s, "N8000AA", true, time.Now().UTC())
+	createFixture(t, s, "N8000BB", true, time.Now().UTC())
+	pubs, err := s.Queries().ListPublications(ctx)
+	if err != nil {
+		t.Fatalf("list publications: %v", err)
+	}
+	if len(pubs) != 2 {
+		t.Fatalf("publications = %d, want 2", len(pubs))
+	}
+	watches, err := s.Queries().ListWatches(ctx)
+	if err != nil {
+		t.Fatalf("list watches: %v", err)
+	}
+	if len(watches) != 2 {
+		t.Fatalf("watches = %d, want 2", len(watches))
+	}
+}
