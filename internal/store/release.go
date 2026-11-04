@@ -50,8 +50,8 @@ func (q *Queries) GetReleaseByExternalID(ctx context.Context, publicationID, ext
 }
 
 func (q *Queries) ListReleasesByPublication(ctx context.Context, publicationID string, includeRemoved bool, limit int) ([]domain.Release, error) {
-	if limit <= 0 || limit > 5000 {
-		limit = 5000
+	if limit <= 0 || limit > 20000 {
+		limit = 20000
 	}
 	query := `SELECT ` + releaseColumns + ` FROM release WHERE publication_id = ?`
 	if !includeRemoved {
@@ -150,4 +150,20 @@ func scanRelease(row rowScanner) (*domain.Release, error) {
 		return nil, err
 	}
 	return &r, nil
+}
+
+func (q *Queries) TouchReleases(ctx context.Context, ids []string, now time.Time) error {
+	for _, id := range ids {
+		res, err := q.q.ExecContext(ctx,
+			`UPDATE release SET last_seen_at = ? WHERE id = ?`,
+			formatTime(now), id,
+		)
+		if err != nil {
+			return fmt.Errorf("store: touch release: %w", err)
+		}
+		if err := expectOne(res); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -2,7 +2,7 @@
 
 A small self-hosted watcher for new chapters and volumes from public sources. One Go binary, SQLite state, a CLI and an optional systemd timer (hourly by default, with a 24h default check interval). No server, no Docker, no LLM during scans.
 
-Status: MVP foundation. The repository, docs, build identity and local hooks are in place. Storage, source adapters, scanning, notifications and installation proof are being implemented task by task. See [docs/progress.md](docs/progress.md).
+Status: MVP vertical slice. Add a source, store a silent baseline, scan for new chapters, read events and use stable JSON from any agent. Telegram delivery, backup/restore and installation proof are still being implemented. See [docs/progress.md](docs/progress.md).
 
 ## Build from source
 
@@ -14,13 +14,14 @@ scripts/build.sh --all
 
 `version` reports honest build identity. A plain `go build` reports `0.1.0-dev` / `unknown` / `development`.
 
-## Quick start (after the MVP tasks land)
+## Quick start
 
 ```sh
 release-watcher add https://ncode.syosetu.com/n2166fe/
 release-watcher list --json
 release-watcher scan --due --json
 release-watcher events --json
+release-watcher show <watch-id> --json
 ```
 
 The first `add` stores a baseline, so an old 210-chapter work does not produce a false "210 new chapters" event.

@@ -64,12 +64,14 @@ Stable error codes:
 | `source_forbidden` | source returned 401/403 |
 | `ssrf_blocked` | target resolves to a disallowed address |
 | `not_found` | watch/publication/event id not found |
-| `already_exists` | add matched an existing publication; `data` contains the existing watch |
+| `invalid_argument` | a flag or value is invalid (for example an interval below 1m) |
 | `locked` | another scan holds the lock |
 | `storage_error` | SQLite/migration/backup failure |
 | `notification_failed` | delivery attempt failed (events remain stored) |
 | `config_error` | invalid environment/configuration |
 | `internal_error` | unexpected failure |
+
+A repeated `add` is not an error: it returns `ok: true`, `created: false`, and `data.reason = "already_exists"`.
 
 ## `version`
 
@@ -133,6 +135,7 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
     {
       "watch_id": "watch_...",
       "publication_id": "pub_...",
+      "work_id": "work_...",
       "original_title": "...",
       "title_ru": null,
       "title_en": null,
@@ -141,6 +144,7 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
       "original_url": "...",
       "status": "completed",
       "status_known": true,
+      "status_source": "naro:end",
       "enabled": true,
       "interval_seconds": 86400,
       "last_checked_at": "...",
@@ -155,7 +159,19 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
 }
 ```
 
-`show <watch-id>` returns one watch plus `publication`, `releases` (bounded, newest first) and recent `events` (bounded). Facts, computed values and nulls are kept distinct. A missing localized title is `null`, never a fabricated string.
+`show <watch-id>` returns one nested document. `releases` are bounded (200) and newest first; `events` (20) and `scans` (10) are recent history. Facts, computed values and nulls stay distinct. A missing localized title is `null`, never a fabricated string.
+
+```json
+{
+  "watch": {"watch_id": "watch_...", "work_id": "work_...", "...": "..."},
+  "work": {"id": "work_...", "original_title": "...", "title_ru": null, "title_en": null},
+  "publication": {"id": "pub_...", "publication_type": "wn", "status": "completed", "status_known": true},
+  "source": {"id": "src_...", "kind": "naro", "uri": "...", "external_id": "N2166FE"},
+  "releases": [{"id": "rel_...", "external_id": "N2166FE/1", "kind": "chapter", "is_baseline": true}],
+  "events": [],
+  "scans": [{"id": "scan_...", "result": "baseline", "events_created": 0}]
+}
+```
 
 ## `scan`
 
@@ -171,7 +187,7 @@ Success `data`:
   "succeeded": 1,
   "failed": 1,
   "events_created": 1,
-  "notifications": {"pending": 1, "sent": 0, "failed": 0},
+  "notifications": {"pending": 0, "sent": 0, "failed": 0},
   "results": [
     {
       "watch_id": "watch_...",
@@ -195,7 +211,7 @@ Success `data`:
 }
 ```
 
-One watch failure never prevents the rest. The process exits 3 for a partial failure; the JSON is still complete. The lock error exits 4.
+One watch failure never prevents the rest. The process exits 3 for a partial failure; the JSON is still complete. The lock error exits 4. Notification counts stay zero until the Telegram outbox task; events are already durable.
 
 ## `events`
 
@@ -206,8 +222,10 @@ Ordering is stable: `detected_at ASC, event_id ASC`. `--since` is inclusive; `--
 ```json
 {
   "schema_version": "1.0",
-  "next_cursor": "evt_...",
-  "events": [
+  "ok": true,
+  "data": {
+    "next_cursor": "evt_...",
+    "events": [
     {
       "schema_version": "1.0",
       "event_id": "evt_...",
@@ -248,7 +266,8 @@ Ordering is stable: `detected_at ASC, event_id ASC`. `--since` is inclusive; `--
       "metadata_changes": null,
       "dedupe_key": "..."
     }
-  ]
+    ]
+  }
 }
 ```
 
@@ -265,14 +284,12 @@ Count-only events have `release_ids: []`, a non-null `previous_count`/`current_c
 
 ## `pause`, `resume`, `interval`, `remove`
 
-All return the affected watch (or a bounded removal summary) in `data`. `interval` validates a duration and stores it in seconds. `remove` requires `--yes` for non-interactive use and returns `removed: true` plus the ids removed. Removing one watch never touches another publication line.
+`pause`, `resume` and `interval` return the affected watch object in `data` (same fields as `list`). `interval --global 24h` returns `{"global_interval_seconds": 86400}` and updates every watch still using the previous default interval; watches with a custom interval keep it. `interval <id> 24h` validates a duration of at least 1m and stores it in seconds. `remove <id> --yes` returns `{"removed": true, "watch_id": "...", "publication_id": "..."}`; it deletes the watch, publication line, releases, events, deliveries and scan runs in one transaction. Work/Source rows are removed only when unreferenced. Removing one watch never touches another publication line.
 
 ## `doctor`, `backup`, `restore`, `notify`
 
-- `doctor --json` returns `{"checks":[{"id":"...","status":"ok|warn|error","message":"..."}],"healthy":true|false}`. It is read-only and never migrates.
-- `backup --out <path> --json` returns `{"path":"...","schema_version":...,"bytes":N,"created_at":"..."}`.
-- `restore --in <path> --force --json` returns the restored schema version and a warning that the process must not be running. It fails closed on schema incompatibility.
-- `notify --json` flushes due deliveries and returns counts plus per-delivery outcomes without secrets.
+- `doctor --json` is implemented as a read-only configuration/environment check and returns `{"healthy":true|false,"checks":[{"id":"...","status":"ok|warn|error","message":"..."}]}`. It does not migrate. A deeper schema/permission probe is part of the installation task.
+- `backup`, `restore` and `notify` are planned for the notification and installation tasks; they are not implemented in the current candidate. Their planned shapes are `{"path":"...","schema_version":...,"bytes":N,"created_at":"..."}`, the restored schema version with an exclusivity warning, and delivery counts without secrets.
 
 ## Media Core import
 

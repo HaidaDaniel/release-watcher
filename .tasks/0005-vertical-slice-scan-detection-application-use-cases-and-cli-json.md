@@ -1,7 +1,7 @@
 # Task 0005 - Vertical slice: scan detection, application use cases and CLI JSON
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Scope: app,scan,cli,i18n,lock,docs
@@ -32,6 +32,8 @@ Deliver the first working Narō vertical slice: add a URL with a silent baseline
 - internal/lock/**
 - internal/store/**
 - internal/config/**
+- internal/source/**
+- README.md
 - tests/app/**
 - tests/scan/**
 - tests/cli/**

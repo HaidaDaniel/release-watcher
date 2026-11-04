@@ -154,3 +154,25 @@ func nullIfEmpty(s string) any {
 	}
 	return s
 }
+
+func (q *Queries) UpdatePublicationNextCheck(ctx context.Context, id string, nextCheck, now time.Time) error {
+	res, err := q.q.ExecContext(ctx,
+		`UPDATE publication SET next_check_at = ?, updated_at = ? WHERE id = ?`,
+		formatTime(nextCheck), formatTime(now), id,
+	)
+	if err != nil {
+		return fmt.Errorf("store: update publication next check: %w", err)
+	}
+	return expectOne(res)
+}
+
+func (q *Queries) UpdatePublicationCheckState(ctx context.Context, id string, lastChecked, nextCheck time.Time, now time.Time) error {
+	res, err := q.q.ExecContext(ctx,
+		`UPDATE publication SET last_checked_at = ?, next_check_at = ?, updated_at = ? WHERE id = ?`,
+		formatTime(lastChecked), formatTime(nextCheck), formatTime(now), id,
+	)
+	if err != nil {
+		return fmt.Errorf("store: update publication check state: %w", err)
+	}
+	return expectOne(res)
+}

@@ -1,6 +1,6 @@
 # Release Watcher
 
-Status: MVP foundation. The repository structure, build identity, local hooks and documentation exist. Domain storage, source adapters, scanning, notifications and installation proof are still planned; this document separates those states explicitly.
+Status: MVP vertical slice. The repository foundation, SQLite persistence, Narō/RSS/Atom adapters, scan detection and the CLI vertical slice are implemented. Telegram delivery, backup/restore, installation proof and the Whoosh deployment spike are still planned; this document separates those states explicitly.
 
 ## Mission
 

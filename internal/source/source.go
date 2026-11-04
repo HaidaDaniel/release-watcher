@@ -99,6 +99,12 @@ func NewRegistry(client *httpx.Client) *Registry {
 	}
 }
 
+// NewRegistryWithAdapters allows tests and future callers to supply configured
+// adapters (for example a local fixture server).
+func NewRegistryWithAdapters(naro *NaroAdapter, feed *FeedAdapter) *Registry {
+	return &Registry{naro: naro, feed: feed}
+}
+
 // Fetch selects by URL. Narō URLs are matched by host; everything else is
 // attempted as RSS/Atom and rejected with unsupported_source if it is not a feed.
 func (r *Registry) Fetch(ctx context.Context, rawURL string) (*Snapshot, error) {

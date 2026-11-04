@@ -1,6 +1,6 @@
 # Architecture
 
-Status: the repository, CLI bootstrap, SQLite persistence and normalized Narō/RSS/Atom adapters with an SSRF-safe HTTP client are implemented. Scanning, notifications and deployment proof are planned. The target shape below is intentionally small.
+Status: the repository, CLI bootstrap, SQLite persistence, normalized Narō/RSS/Atom adapters, scan detection and the CLI vertical slice are implemented. Notifications, backup/restore, deployment proof and the Whoosh spike are planned. The target shape below is intentionally small.
 
 ## Shape
 

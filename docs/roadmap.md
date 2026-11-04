@@ -11,7 +11,7 @@ The order is dependency-driven. A stage is complete only when its implementation
 
 Exit: documented scope, `go build`/`go test`/`go vet`, hooks fire, honest status.
 
-## Stage 1 — Persistence and domain (task 0003)
+## Stage 1 — Persistence and domain (task 0003) — done
 
 - SQLite migrations and schema version.
 - Work, Publication, Source, Watch, Release, Event, NotificationDelivery, ScanRun repositories.
@@ -20,7 +20,7 @@ Exit: documented scope, `go build`/`go test`/`go vet`, hooks fire, honest status
 
 Exit: state survives restart; migrations are append-only; dedupe and baseline are tested.
 
-## Stage 2 — Narō vertical slice (tasks 0004–0005)
+## Stage 2 — Narō vertical slice (tasks 0004–0005) — done
 
 - HTTP client with timeout, retry, pacing and SSRF guard.
 - Narō adapter: official API metadata, catalog pages, pagination, count-only degradation, explicit status semantics.
@@ -28,7 +28,7 @@ Exit: state survives restart; migrations are append-only; dedupe and baseline ar
 - Scan comparison, event creation, independent per-watch errors.
 - CLI `add`, `list`, `show`, `scan`, `events`, `pause`, `resume`, `interval`, `remove` with stable JSON.
 
-Exit: add `https://ncode.syosetu.com/n2166fe/`, baseline without a false notification, detect a fixture new chapter, read the event through CLI JSON.
+Exit: add `https://ncode.syosetu.com/n2166fe/`, baseline without a false notification, detect a fixture new chapter, read the event through CLI JSON. Reached with fixture HTTP servers; the live Narō smoke remains a separate polite check.
 
 ## Stage 3 — Notifications (task 0006)
 

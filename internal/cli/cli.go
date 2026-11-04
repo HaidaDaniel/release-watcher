@@ -8,10 +8,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/HaidaDaniel/release-watcher/internal/app"
 	"github.com/HaidaDaniel/release-watcher/internal/buildinfo"
 	"github.com/HaidaDaniel/release-watcher/internal/config"
+	"github.com/HaidaDaniel/release-watcher/internal/i18n"
+	"github.com/HaidaDaniel/release-watcher/internal/logging"
+	"github.com/HaidaDaniel/release-watcher/internal/source"
+	"github.com/HaidaDaniel/release-watcher/internal/source/httpx"
+	"github.com/HaidaDaniel/release-watcher/internal/store"
 )
 
 const SchemaVersion = "1.0"
@@ -26,12 +33,14 @@ const (
 )
 
 type runner struct {
-	stdout io.Writer
-	stderr io.Writer
-	getenv func(string) string
-	json   bool
-	lang   string
-	help   bool
+	stdout  io.Writer
+	stderr  io.Writer
+	getenv  func(string) string
+	json    bool
+	logJSON bool
+	lang    string
+	help    bool
+	version bool
 }
 
 type envelope struct {
@@ -63,23 +72,53 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		getenv = os.Getenv
 	}
 	r := &runner{stdout: stdout, stderr: stderr, getenv: getenv}
-	command, err := r.parse(args)
+	rest, err := r.parseGlobals(args)
 	if err != nil {
 		return r.fail(err)
 	}
-	if command == "" {
+	if r.version && len(rest) == 0 {
+		rest = []string{"version"}
+	}
+	if r.help {
+		if len(rest) > 0 {
+			r.printCommandHelp(rest[0])
+		} else {
+			r.printHelp()
+		}
+		return ExitOK
+	}
+	if len(rest) == 0 {
 		r.printHelp()
 		return ExitOK
 	}
 
+	command, commandArgs := rest[0], rest[1:]
 	switch command {
 	case "help":
 		r.printHelp()
 		return ExitOK
 	case "version":
-		return r.version()
+		return r.versionCmd(commandArgs)
 	case "doctor":
-		return r.doctor(ctx)
+		return r.doctor(ctx, commandArgs)
+	case "add":
+		return r.add(ctx, commandArgs)
+	case "list":
+		return r.list(ctx, commandArgs)
+	case "show":
+		return r.show(ctx, commandArgs)
+	case "scan":
+		return r.scan(ctx, commandArgs)
+	case "events":
+		return r.events(ctx, commandArgs)
+	case "pause":
+		return r.pause(ctx, commandArgs)
+	case "resume":
+		return r.resume(ctx, commandArgs)
+	case "interval":
+		return r.interval(ctx, commandArgs)
+	case "remove":
+		return r.remove(ctx, commandArgs)
 	default:
 		return r.fail(&commandError{
 			code:    "usage",
@@ -89,19 +128,18 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 	}
 }
 
-func (r *runner) parse(args []string) (string, error) {
-	var command string
+func (r *runner) parseGlobals(args []string) ([]string, *commandError) {
+	var rest []string
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
 		case arg == "--json":
 			r.json = true
 		case arg == "--log-json":
-			// Accepted for forward compatibility; logging format is read from
-			// the environment by the logger in later tasks.
+			r.logJSON = true
 		case arg == "--lang":
 			if i+1 >= len(args) {
-				return "", &commandError{code: "usage", message: "--lang requires ru or en", exit: ExitUsage}
+				return nil, &commandError{code: "usage", message: "--lang requires ru or en", exit: ExitUsage}
 			}
 			i++
 			r.lang = args[i]
@@ -110,23 +148,9 @@ func (r *runner) parse(args []string) (string, error) {
 		case arg == "--help" || arg == "-h":
 			r.help = true
 		case arg == "--version":
-			command = "version"
-		case strings.HasPrefix(arg, "-"):
-			return "", &commandError{
-				code:    "usage",
-				message: fmt.Sprintf("unknown flag %q", arg),
-				exit:    ExitUsage,
-			}
+			r.version = true
 		default:
-			if command == "" {
-				command = arg
-			} else {
-				return "", &commandError{
-					code:    "usage",
-					message: fmt.Sprintf("unexpected argument %q", arg),
-					exit:    ExitUsage,
-				}
-			}
+			rest = append(rest, arg)
 		}
 	}
 	if r.lang == "" {
@@ -136,15 +160,104 @@ func (r *runner) parse(args []string) (string, error) {
 		r.lang = "ru"
 	}
 	if r.lang != "ru" && r.lang != "en" {
-		return "", &commandError{code: "usage", message: "--lang must be ru or en", exit: ExitUsage}
+		return nil, &commandError{code: "usage", message: "--lang must be ru or en", exit: ExitUsage}
 	}
-	if r.help {
-		return "help", nil
-	}
-	return command, nil
+	return rest, nil
 }
 
-func (r *runner) version() int {
+type flagKind int
+
+const (
+	boolFlag flagKind = iota
+	valueFlag
+)
+
+func parseCommandArgs(args []string, specs map[string]flagKind) (map[string]string, []string, *commandError) {
+	values := map[string]string{}
+	var positionals []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			positionals = append(positionals, args[i+1:]...)
+			break
+		}
+		if !strings.HasPrefix(arg, "--") || arg == "--" {
+			positionals = append(positionals, arg)
+			continue
+		}
+		name := strings.TrimPrefix(arg, "--")
+		value := ""
+		if idx := strings.IndexByte(name, '='); idx >= 0 {
+			value = name[idx+1:]
+			name = name[:idx]
+		}
+		kind, ok := specs[name]
+		if !ok {
+			return nil, nil, &commandError{code: "usage", message: fmt.Sprintf("unknown flag --%s", name), exit: ExitUsage}
+		}
+		switch kind {
+		case boolFlag:
+			if value == "" {
+				values[name] = "true"
+			} else if _, err := strconv.ParseBool(value); err != nil {
+				return nil, nil, &commandError{code: "usage", message: fmt.Sprintf("--%s expects true or false", name), exit: ExitUsage}
+			} else {
+				values[name] = value
+			}
+		case valueFlag:
+			if value == "" {
+				if i+1 >= len(args) {
+					return nil, nil, &commandError{code: "usage", message: fmt.Sprintf("--%s requires a value", name), exit: ExitUsage}
+				}
+				i++
+				value = args[i]
+			}
+			values[name] = value
+		}
+	}
+	return values, positionals, nil
+}
+
+func flagBool(values map[string]string, name string) bool {
+	value, ok := values[name]
+	if !ok {
+		return false
+	}
+	parsed, err := strconv.ParseBool(value)
+	return err == nil && parsed
+}
+
+func (r *runner) openService(ctx context.Context) (*app.Service, func(), *commandError) {
+	cfg, err := config.Load(r.getenv)
+	if err != nil {
+		return nil, nil, &commandError{code: "config_error", message: err.Error(), exit: ExitError}
+	}
+	if r.logJSON {
+		cfg.LogFormat = "json"
+	}
+	st, err := store.Open(ctx, cfg.DBPath)
+	if err != nil {
+		return nil, nil, &commandError{code: "storage_error", message: err.Error(), exit: ExitError}
+	}
+	logger := logging.New(cfg.LogFormat, cfg.LogLevel, r.stderr)
+	client := httpx.New(httpx.Config{
+		UserAgent:         cfg.UserAgent,
+		Timeout:           cfg.HTTPTimeout,
+		MaxRedirects:      cfg.MaxRedirects,
+		MaxRetries:        cfg.MaxRetries,
+		RateInterval:      cfg.RateInterval,
+		MaxBodyBytes:      cfg.MaxBodyBytes,
+		AllowPrivateHosts: cfg.AllowPrivateHosts,
+	})
+	reg := source.NewRegistry(client)
+	svc := app.New(cfg, st, reg, logger)
+	return svc, func() { _ = st.Close() }, nil
+}
+
+func (r *runner) versionCmd(args []string) int {
+	if len(args) != 0 {
+		return r.fail(&commandError{code: "usage", message: "version takes no arguments", exit: ExitUsage})
+	}
 	info := buildinfo.Get()
 	if r.json {
 		r.writeJSON(envelope{SchemaVersion: SchemaVersion, OK: true, Data: info})
@@ -155,7 +268,10 @@ func (r *runner) version() int {
 	return ExitOK
 }
 
-func (r *runner) doctor(ctx context.Context) int {
+func (r *runner) doctor(ctx context.Context, args []string) int {
+	if len(args) != 0 {
+		return r.fail(&commandError{code: "usage", message: "doctor takes no arguments", exit: ExitUsage})
+	}
 	cfg, err := config.Load(r.getenv)
 	if err != nil {
 		return r.fail(&commandError{code: "config_error", message: err.Error(), exit: ExitError})
@@ -190,7 +306,7 @@ func (r *runner) doctor(ctx context.Context) int {
 	}
 
 	if _, statErr := os.Stat(cfg.DBPath); statErr == nil {
-		add("storage", "ok", "database file exists; schema checks arrive with the storage task")
+		add("storage", "ok", "database file exists")
 	} else if os.IsNotExist(statErr) {
 		add("storage", "warn", "database has not been initialized yet")
 	} else {
@@ -277,28 +393,45 @@ func (r *runner) writeJSON(v any) {
 	_ = enc.Encode(v)
 }
 
-func (r *runner) fail(err error) int {
-	ce, ok := err.(*commandError)
-	if !ok {
-		ce = &commandError{code: "internal_error", message: "internal error", exit: ExitError}
+func (r *runner) fail(err *commandError) int {
+	if err == nil {
+		err = &commandError{code: "internal_error", message: "internal error", exit: ExitError}
 	}
 	if r.json {
 		r.writeJSON(envelope{
 			SchemaVersion: SchemaVersion,
 			OK:            false,
 			Error: &errorShape{
-				Code:    ce.code,
-				Message: ce.message,
-				Details: ce.details,
+				Code:    err.code,
+				Message: err.message,
+				Details: err.details,
 			},
 		})
 	} else {
-		fmt.Fprintf(r.stderr, "error: %s\n", ce.message)
+		fmt.Fprintf(r.stderr, "%s %s\n", r.t("Ошибка:", "Error:"), err.message)
 	}
-	if ce.exit == 0 {
+	if err.exit == 0 {
 		return ExitError
 	}
-	return ce.exit
+	return err.exit
+}
+
+func (r *runner) failApp(err *app.Error) int {
+	if err == nil {
+		return r.fail(&commandError{code: "internal_error", message: "internal error", exit: ExitError})
+	}
+	exit := ExitError
+	switch err.Code {
+	case "usage", "invalid_argument", "invalid_url", "unsupported_source":
+		exit = ExitUsage
+	case "locked":
+		exit = ExitLocked
+	}
+	return r.fail(&commandError{code: err.Code, message: err.Message, details: err.Details, exit: exit})
+}
+
+func (r *runner) t(ru, en string) string {
+	return i18n.Text(r.lang, ru, en)
 }
 
 func (r *runner) printHelp() {
@@ -309,20 +442,39 @@ func (r *runner) printHelp() {
 	fmt.Fprint(r.stdout, helpRU)
 }
 
+func (r *runner) printCommandHelp(command string) {
+	if r.lang == "en" {
+		fmt.Fprintf(r.stdout, "release-watcher %s\n\nSee docs/integration-contract.md for JSON contracts and flags.\n", command)
+		return
+	}
+	fmt.Fprintf(r.stdout, "release-watcher %s\n\nФлаги и JSON-контракт: docs/integration-contract.md\n", command)
+}
+
 const helpRU = `Release Watcher — отслеживание новых публикаций.
 
 Использование:
   release-watcher <команда> [флаги]
 
 Команды:
-  version           показать версию и build identity
-  doctor            проверить конфигурацию и окружение (read-only)
-  help              показать эту справку
+  add <url>                 добавить источник и сохранить baseline
+  list                      показать наблюдения
+  show <id>                 показать наблюдение, релизы и события
+  scan [--due|--all|--id]   проверить источники
+  events                    прочитать события
+  pause <id>                приостановить наблюдение
+  resume <id>               возобновить наблюдение
+  interval <id> <dur>       изменить интервал наблюдения
+  interval --global <dur>   изменить интервал по умолчанию
+  remove <id> --yes         удалить наблюдение и его данные
+  doctor                    проверить конфигурацию и окружение
+  version                   показать версию и build identity
+  help                      показать эту справку
 
 Глобальные флаги:
-  --json            машиночитаемый JSON (schema_version 1.0)
-  --lang ru|en      язык человекочитаемого вывода
-  --help            справка
+  --json                    машиночитаемый JSON (schema_version 1.0)
+  --lang ru|en              язык человекочитаемого вывода
+  --log-json                JSON-логи в stderr
+  --help                    справка
 
 Документация: docs/integration-contract.md
 `
@@ -333,14 +485,25 @@ Usage:
   release-watcher <command> [flags]
 
 Commands:
-  version           show version and build identity
-  doctor            inspect configuration and environment (read-only)
-  help              show this help
+  add <url>                 add a source and store a baseline
+  list                      list watches
+  show <id>                 show a watch, releases and events
+  scan [--due|--all|--id]   check sources
+  events                    read events
+  pause <id>                pause a watch
+  resume <id>               resume a watch
+  interval <id> <dur>       change a watch interval
+  interval --global <dur>   change the default interval
+  remove <id> --yes         remove a watch and its data
+  doctor                    inspect configuration and environment
+  version                   show version and build identity
+  help                      show this help
 
 Global flags:
-  --json            machine-readable JSON (schema_version 1.0)
-  --lang ru|en      human output language
-  --help            help
+  --json                    machine-readable JSON (schema_version 1.0)
+  --lang ru|en              human output language
+  --log-json                JSON logs on stderr
+  --help                    help
 
 Documentation: docs/integration-contract.md
 `

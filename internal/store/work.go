@@ -71,3 +71,14 @@ func expectOne(res sql.Result) error {
 	}
 	return nil
 }
+
+func (q *Queries) UpdateWorkOriginalTitle(ctx context.Context, id, title string, now time.Time) error {
+	res, err := q.q.ExecContext(ctx,
+		`UPDATE work SET original_title = ?, updated_at = ? WHERE id = ?`,
+		title, formatTime(now), id,
+	)
+	if err != nil {
+		return fmt.Errorf("store: update work title: %w", err)
+	}
+	return expectOne(res)
+}

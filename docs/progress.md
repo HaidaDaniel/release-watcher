@@ -6,7 +6,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 - Scan comparison, application use cases and CLI JSON (task 0005).
 - Telegram outbox and RU/EN notifications (task 0006).
-- Backup/restore, doctor, systemd installation and Whoosh assessment (task 0007).
+- Backup/restore, full read-only doctor, systemd installation and Whoosh assessment (task 0007).
 - Media Core documentation in its own repository.
 - Whoosh Core deployment spike and first controlled deployment after MVP.
 - Backlog sources and MCP stdio.
@@ -24,6 +24,9 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - SSRF-safe HTTP client with timeout, redirect limit, per-host pacing, retries, body limits and no environment proxy.
 - Narō adapter using the official novel API plus paginated catalog pages, with complete/partial/count_only snapshots.
 - RSS 2.0/RSS 1.0 and Atom adapter with stable entry ids and sliding-window semantics.
+- Scan comparison with silent baselines, catalog add/update/remove, count-only change events, metadata/status events and event dedupe.
+- CLI commands `add`, `list`, `show`, `scan`, `events`, `pause`, `resume`, `interval`, `remove` with stable JSON, RU/EN human output and exit codes.
+- Process-level scan lock and per-watch timeout/error isolation.
 
 ## Tested
 
@@ -32,6 +35,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - `scripts/verify-push.sh` runs gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...` and APK lint.
 - Source tests: SSRF address policy (including exotic IPv6) and dial-time blocking, retry, pacing, header/body timeout, cancellation, redirect/body limits, status mapping, Narō catalog/pagination/partial/count-only/status-unknown/undercount/missing-update-block/empty-first-page/404-page-boundary, RSS 2.0/RSS 1.0/Atom parsing, relative links, fallback-id collisions and kind mismatch: see task 0004 evidence.
 - No live Narō smoke test has been run; adapter tests use local fixtures and test servers.
+- Application/scan/CLI tests: first add baseline without events, duplicate add, one/many new chapters, replay without duplicates, failure/recovery, RSS sliding window, count-only reconciliation, due intervals, pause/resume/remove, restart, event pagination, metadata/status changes, invalid/unknown URLs, concurrent scan lock, partial scan isolation and JSON CLI flows: see task 0005 evidence.
 
 ## Deployed
 
@@ -45,4 +49,4 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Next step
 
-Task 0005: scan detection, application use cases and CLI JSON.
+Task 0006: Telegram outbox, retry and RU/EN notifications.

@@ -88,3 +88,10 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Dependencies: `modernc.org/sqlite` (ADR-0002), `golang.org/x/net/html` for bounded Narō catalog parsing, and `lefthook` as a development-only hook runner. Standard library `log/slog`, `net/http`, `encoding/xml`, `archive/zip` and `database/sql` cover the rest.
 - Decision: No web framework, ORM, CLI framework, retry library, scheduler library or notification framework. Add a dependency only with a recorded reason and a test.
 - Consequences: Small binary and small audit surface. Parsing and retry helpers stay explicit and testable.
+
+## ADR-0013 — The CLI is the MVP contract, with a process lock and isolated watches
+
+- Date: 2026-11-04
+- Status: Accepted and implemented by task 0005
+- Decision: Every read and mutation command returns either a localized human rendering or one JSON envelope (`schema_version`, `ok`, `data`/`error`). Machine codes and field names are English. Exit codes are 0 success, 1 runtime failure, 2 usage/input, 3 partial scan, 4 scan lock held. `add` is idempotent for the same source line and returns the existing watch with `created: false`; the first add stores a baseline and emits no release events. `scan --due` uses persisted `next_check_at`, `--all` scans all enabled watches, and `--id` forces one watch. A process file lock prevents overlapping scans. Each watch has its own timeout; one failure is recorded and does not stop the others.
+- Consequences: Agents can drive the same use cases as humans without a server. Events remain the durable source for future MCP and Media Core. A partial scan is visible in both the JSON result and exit code 3, so a timer can alarm without hiding successful watches.
