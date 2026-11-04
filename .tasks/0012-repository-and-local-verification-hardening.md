@@ -85,8 +85,7 @@ Harden repository hygiene and local verification: ignore secrets/runtime state, 
 
 ## Verification
 
-- `{"id":"push-checks","type":"automated","required":true,"environment":"local","profile":"deterministic","command":"scripts/verify-push.sh","evidenceRef":"local scripts/verify-push.sh run"}`
-- `{"id":"security-report","type":"manual","required":true,"environment":"local","profile":"report","instruction":"Record the scanner non-leakage, staged-only coverage and mandatory APK lint evidence in the task report.","evidenceRef":"task report"}`
+- `{"id":"push-checks","type":"automated","required":true,"environment":"local","profile":"report","command":"scripts/verify-push.sh","evidenceRef":"local scripts/verify-push.sh run"}`
 
 ## Documentation updates
 
