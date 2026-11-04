@@ -229,3 +229,17 @@ func TestIncompleteCatalogKeepsCountOnly(t *testing.T) {
 		t.Fatalf("change = %+v", change)
 	}
 }
+
+func TestCountOnlyReconcileMarksAbsentReleasesRemovedSilently(t *testing.T) {
+	pub, watch, work := baseInputs()
+	watch.Mode = domain.ModeCountOnly
+	pub.ReleaseCount = int64Ptr(2)
+	existing := []domain.Release{release("1", "h1"), release("3", "h3")}
+	change, err := scan.Compare(pub, watch, work, snapshot(domain.ModeCatalog, true, srcRelease("1", "h1"), srcRelease("2", "h2")), existing, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !change.Reconcile || len(change.Added) != 2 || len(change.Removed) != 1 || change.Removed[0].ExternalID != "3" {
+		t.Fatalf("change = %+v", change)
+	}
+}

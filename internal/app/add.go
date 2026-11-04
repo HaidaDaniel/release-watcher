@@ -177,9 +177,14 @@ func (s *Service) Add(ctx context.Context, in AddInput) (*AddResult, *Error) {
 		if err := q.CreateWork(ctx, work); err != nil {
 			return err
 		}
+		baselineReleases := dedupeSourceReleases(snapshot.Releases)
+		baselineCount = int64(len(baselineReleases))
+		if snapshot.Mode == domain.ModeCountOnly || len(baselineReleases) == 0 {
+			baselineCount = snapshot.Count
+		}
 		pubCount := snapshot.Count
-		if int64(len(snapshot.Releases)) > pubCount {
-			pubCount = int64(len(snapshot.Releases))
+		if baselineCount > pubCount {
+			pubCount = baselineCount
 		}
 		pub = &domain.Publication{
 			ID:              id.New("pub"),
@@ -200,10 +205,6 @@ func (s *Service) Add(ctx context.Context, in AddInput) (*AddResult, *Error) {
 			return err
 		}
 
-		baselineCount = pubCount
-		if len(snapshot.Releases) > 0 {
-			baselineCount = int64(len(snapshot.Releases))
-		}
 		watchID := id.New("watch")
 		watch := &domain.Watch{
 			ID:                    watchID,
@@ -222,7 +223,7 @@ func (s *Service) Add(ctx context.Context, in AddInput) (*AddResult, *Error) {
 		if err := q.CreateWatch(ctx, watch); err != nil {
 			return err
 		}
-		for _, sr := range snapshot.Releases {
+		for _, sr := range baselineReleases {
 			release := baselineRelease(sr, pub.ID, now)
 			if err := q.InsertRelease(ctx, &release); err != nil {
 				return err
@@ -345,4 +346,17 @@ func (s *Service) findExistingAdd(ctx context.Context, rawURL string, u *url.URL
 		Warnings:              []string{},
 		ExternalWorkReference: externalWorkReference(b.source),
 	}, true, nil
+}
+
+func dedupeSourceReleases(releases []source.Release) []source.Release {
+	seen := map[string]bool{}
+	out := make([]source.Release, 0, len(releases))
+	for _, r := range releases {
+		if seen[r.ExternalID] {
+			continue
+		}
+		seen[r.ExternalID] = true
+		out = append(out, r)
+	}
+	return out
 }

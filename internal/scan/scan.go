@@ -87,6 +87,15 @@ func Compare(pub *domain.Publication, watch *domain.Watch, work *domain.Work, sn
 			}
 			change.Added = append(change.Added, current)
 		}
+		for _, previous := range existing {
+			if previous.RemovedAt != nil || seen[previous.ExternalID] {
+				continue
+			}
+			removed := previous
+			removed.RemovedAt = &now
+			removed.LastSeenAt = now
+			change.Removed = append(change.Removed, removed)
+		}
 		return change, nil
 	}
 

@@ -573,3 +573,23 @@ func TestShowReturnsRecentEvents(t *testing.T) {
 		t.Fatalf("show newest event = %+v", newest.ReleaseIDs)
 	}
 }
+
+func TestAddCollapsesDuplicateFeedEntries(t *testing.T) {
+	r := newRSSFixture(t, []rssEntry{
+		{ID: "A", Title: "Entry A", Date: "Mon, 02 Nov 2026 10:00:00 GMT"},
+		{ID: "A", Title: "Entry A", Date: "Mon, 02 Nov 2026 10:00:00 GMT"},
+	})
+	env := newTestEnv(t, nil)
+	ctx := context.Background()
+	added, err := env.svc.Add(ctx, app.AddInput{URL: r.server.URL + "/feed.xml"})
+	if err != nil {
+		t.Fatalf("add with duplicate entries: %v", err)
+	}
+	if added.BaselineReleases != 1 {
+		t.Fatalf("baseline = %d", added.BaselineReleases)
+	}
+	show, _ := env.svc.Show(ctx, added.WatchID)
+	if len(show.Releases) != 1 {
+		t.Fatalf("releases = %d", len(show.Releases))
+	}
+}

@@ -184,6 +184,11 @@ func (s *Service) applyBaseline(ctx context.Context, q *store.Queries, b *bundle
 			}
 		}
 	}
+	for _, release := range change.Removed {
+		if err := q.MarkReleaseRemoved(ctx, release.ID, now); err != nil {
+			return err
+		}
+	}
 	count := int64(len(change.Added))
 	if snapshot.Mode == domain.ModeCountOnly || len(change.Added) == 0 {
 		count = snapshot.Count

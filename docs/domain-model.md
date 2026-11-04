@@ -161,6 +161,6 @@ History of checks and their outcome: started/finished time, watch/publication, r
 2. For `catalog` snapshots, compare by `external_id`, then by identity-relevant fields. New ids produce `release.added`; changed ids produce `release.updated`; missing ids produce `release.removed` only when the adapter declares the catalog authoritative and complete.
 3. For RSS, missing old entries never imply removal because feeds are sliding windows.
 4. For `count_only`, store the count and emit a count event only when the count changes. Never invent numbers or URLs.
-5. A count-only baseline that later gains a complete catalog is reconciled silently (no bulk "new" event) before normal catalog detection resumes. A partial catalog recovery stays in count-only mode and emits no events.
+5. A count-only baseline that later gains a complete catalog is reconciled silently (no bulk "new" event) before normal catalog detection resumes; releases absent from the recovered complete catalog are marked removed silently, and a partial catalog recovery stays in count-only mode and emits no events. Duplicate external ids in one snapshot are collapsed before storage.
 6. Metadata events are separate from release events so consumers can choose their own presentation.
 7. Notification grouping uses one event per change category per scan; three new chapters become one `release.added` event with three release references, not three messages.
