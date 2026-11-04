@@ -67,6 +67,8 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 Tasks 0003–0007 were recorded with `Depends on: none` even though their work was sequential. Their history and candidate-bound evidence are not rewritten. Corrective tasks 0011–0016 declare their real dependencies (`0007 -> 0011..0014 -> 0015 -> 0016 -> 0008`), and 0008 now depends on 0016. Some corrective tasks needed an append-only APK epoch because their claim baseline was captured after edits; the predecessor history remains visible and no old evidence was copied.
 
+APK v0.5.2 typed 0016 as `release`, whose template asks for hosted CI, a tag and post-tag install evidence. 0016 actually accepted the functional MVP with local checks, a live Narō smoke and a report; no CI/tag/deploy was performed or claimed. The mismatch is recorded in ADR-0019. Future deployment work uses `Type: deployment` (0008) with real live checks; 0016 is not rewritten.
+
 ## Next step
 
 Remaining backlog: Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.
