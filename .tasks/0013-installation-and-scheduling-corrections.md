@@ -1,6 +1,6 @@
 # Task 0013 - Installation and scheduling corrections
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
