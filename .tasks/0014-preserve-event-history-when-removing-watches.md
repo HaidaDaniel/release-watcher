@@ -1,7 +1,7 @@
 # Task 0014 - Preserve event history when removing watches
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Type: bugfix
