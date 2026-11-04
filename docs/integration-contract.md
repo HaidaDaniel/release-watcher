@@ -109,7 +109,7 @@ Success `data`:
   "source_type": "naro",
   "original_url": "https://ncode.syosetu.com/n2166fe/",
   "external_work_reference": "ncode:N2166FE",
-  "status": "completed",
+  "status": "ongoing",
   "status_known": true,
   "status_source": "naro:end",
   "last_published_at": "2023-08-01T13:25:09Z",
@@ -142,7 +142,7 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
       "publication_type": "wn",
       "source_type": "naro",
       "original_url": "...",
-      "status": "completed",
+      "status": "ongoing",
       "status_known": true,
       "status_source": "naro:end",
       "last_published_at": "...",
@@ -166,7 +166,7 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
 {
   "watch": {"watch_id": "watch_...", "work_id": "work_...", "...": "..."},
   "work": {"id": "work_...", "original_title": "...", "title_ru": null, "title_en": null},
-  "publication": {"id": "pub_...", "publication_type": "wn", "status": "completed", "status_known": true},
+  "publication": {"id": "pub_...", "publication_type": "wn", "status": "ongoing", "status_known": true},
   "source": {"id": "src_...", "kind": "naro", "uri": "...", "external_id": "N2166FE"},
   "releases": [{"id": "rel_...", "external_id": "N2166FE/1", "kind": "chapter", "is_baseline": true}],
   "events": [],
@@ -244,7 +244,7 @@ Event listing is ordered `detected_at ASC, event_id ASC`; `show` uses the newest
       "publication": {
         "source_type": "naro",
         "original_url": "https://ncode.syosetu.com/n2166fe/",
-        "status": "completed",
+        "status": "ongoing",
         "status_known": true
       },
       "release_ids": ["N2166FE/211", "N2166FE/212", "N2166FE/213"],
@@ -282,6 +282,10 @@ Event types:
 - `release.count_changed` — count-only source count changed decreasingly or without identities.
 
 Count-only events have `release_ids: []`, a non-null `previous_count`/`current_count`/`count_delta`, and no invented numbers or URLs. An empty RSS/Atom window is not a count change and emits no event. A count-only source that recovers to a complete catalog is reconciled silently; a partial recovery stays count-only.
+
+## Narō status semantics
+
+The Narō novel API `end` field is authoritative only for the values documented by the official specification (`https://dev.syosetu.com/man/api/`): `0` means a short story or completed work, and `1` means ongoing. A missing, `null` or unsupported value leaves `status` as `unknown` and `status_source` empty. Inactivity and an old `general_lastup` never imply completion. A `completed` watch remains enabled because an author may resume publication.
 
 ## `pause`, `resume`, `interval`, `remove`
 

@@ -53,7 +53,7 @@ SQLite is the only datastore. Pure-Go SQLite keeps `CGO_ENABLED=0` cross-compila
 
 An adapter reports applicability, fetches metadata plus releases, normalizes identities and states which fields it can prove. It never invents chapter numbers, URLs or completion status.
 
-- Narō uses `api.syosetu.com/novelapi/api/` for metadata and `ncode.syosetu.com` catalog pages for stable chapter identities. If the catalog is temporarily unavailable the adapter may degrade to `count_only`; recovery is reconciled without a bulk false notification.
+- Narō uses `api.syosetu.com/novelapi/api/` for metadata and `ncode.syosetu.com` catalog pages for stable chapter identities. If the catalog is temporarily unavailable the adapter may degrade to `count_only`; recovery is reconciled without a bulk false notification. The Narō `end` field maps `0` to completed/short story, `1` to ongoing, and any missing or unsupported value to unknown; inactivity is never treated as completion.
 - RSS/Atom uses XML parsing and stable entry IDs (guid/id, else link, else a bounded hash). Feed windows are sliding: an old entry disappearing from the feed is not a removal.
 - Unsupported URLs fail with a stable error code before any state is written.
 

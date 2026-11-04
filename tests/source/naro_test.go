@@ -45,7 +45,7 @@ func TestNaroFetchCatalog(t *testing.T) {
 	if got.Metadata.OriginalTitle != "夢見る男子は現実主義者" {
 		t.Fatalf("title = %q", got.Metadata.OriginalTitle)
 	}
-	if got.Metadata.Status != domain.StatusCompleted || got.Metadata.StatusSource != "naro:end" {
+	if got.Metadata.Status != domain.StatusOngoing || got.Metadata.StatusSource != "naro:end" {
 		t.Fatalf("status = %q source=%q", got.Metadata.Status, got.Metadata.StatusSource)
 	}
 	if got.Metadata.LastPublishedAt == nil || !got.Metadata.LastPublishedAt.Equal(time.Date(2023, 8, 1, 13, 25, 9, 0, time.UTC)) {
@@ -71,6 +71,57 @@ func TestNaroFetchCatalog(t *testing.T) {
 		if !strings.Contains(fields, want) {
 			t.Fatalf("fields %q missing %q", fields, want)
 		}
+	}
+}
+
+func TestNaroEndFieldSemantics(t *testing.T) {
+	base := string(fixture(t, "naro_api.json"))
+	tests := []struct {
+		name       string
+		api        string
+		wantStatus domain.Status
+		wantKnown  bool
+	}{
+		{name: "end zero is completed", api: strings.Replace(base, `"end":1`, `"end":0`, 1), wantStatus: domain.StatusCompleted, wantKnown: true},
+		{name: "end one is ongoing", api: base, wantStatus: domain.StatusOngoing, wantKnown: true},
+		{name: "end null is unknown", api: strings.Replace(base, `"end":1`, `"end":null`, 1), wantStatus: domain.StatusUnknown, wantKnown: false},
+		{name: "end missing is unknown", api: strings.Replace(base, `,"end":1`, ``, 1), wantStatus: domain.StatusUnknown, wantKnown: false},
+		{name: "unsupported end is unknown", api: strings.Replace(base, `"end":1`, `"end":2`, 1), wantStatus: domain.StatusUnknown, wantKnown: false},
+		{name: "negative end is unknown", api: strings.Replace(base, `"end":1`, `"end":-1`, 1), wantStatus: domain.StatusUnknown, wantKnown: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/novelapi/api/" {
+					_, _ = w.Write([]byte(tt.api))
+					return
+				}
+				_, _ = w.Write(fixture(t, "naro_catalog.html"))
+			}))
+			defer server.Close()
+
+			adapter := source.NewNaro(testClient())
+			adapter.APIBase = server.URL + "/novelapi/api/"
+			adapter.CatalogBase = server.URL + "/"
+			got, err := adapter.Fetch(context.Background(), "https://ncode.syosetu.com/n2166fe/")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Metadata.Status != tt.wantStatus {
+				t.Fatalf("status = %q, want %q", got.Metadata.Status, tt.wantStatus)
+			}
+			wantSource := ""
+			if tt.wantKnown {
+				wantSource = "naro:end"
+			}
+			if got.Metadata.StatusSource != wantSource {
+				t.Fatalf("status source = %q, want %q", got.Metadata.StatusSource, wantSource)
+			}
+			hasStatus := strings.Contains(strings.Join(got.FieldsAvailable, ","), "status")
+			if hasStatus != tt.wantKnown {
+				t.Fatalf("status field available = %v, want %v", hasStatus, tt.wantKnown)
+			}
+		})
 	}
 }
 

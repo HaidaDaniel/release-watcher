@@ -126,12 +126,9 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 		Mode:       domain.ModeCatalog,
 		ObservedAt: now,
 	}
-	if meta.End != nil {
-		if *meta.End == 1 {
-			snapshot.Metadata.Status = domain.StatusCompleted
-		} else {
-			snapshot.Metadata.Status = domain.StatusOngoing
-		}
+	status, statusKnown := naroStatus(meta.End)
+	snapshot.Metadata.Status = status
+	if statusKnown {
 		snapshot.Metadata.StatusSource = "naro:end"
 	}
 	if parsed := parseNaroAPIUpTime(meta.GeneralLastup); parsed != nil {
@@ -213,7 +210,7 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 	snapshot.Warnings = warnings
 
 	fields := []string{"original_url", "title"}
-	if meta.End != nil {
+	if statusKnown {
 		fields = append(fields, "status")
 	}
 	if meta.GeneralAllNo != nil {
@@ -230,6 +227,23 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 	}
 	snapshot.FieldsAvailable = fields
 	return snapshot, nil
+}
+
+// naroStatus maps the official novel API end field:
+// 0 = short story or completed, 1 = ongoing. A missing, null or unsupported
+// value is unknown and must not be guessed.
+func naroStatus(end *int) (domain.Status, bool) {
+	if end == nil {
+		return domain.StatusUnknown, false
+	}
+	switch *end {
+	case 0:
+		return domain.StatusCompleted, true
+	case 1:
+		return domain.StatusOngoing, true
+	default:
+		return domain.StatusUnknown, false
+	}
 }
 
 func parseNaroAPI(body []byte) (*naroAPIMeta, error) {

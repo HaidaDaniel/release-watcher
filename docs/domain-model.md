@@ -51,7 +51,7 @@ A concrete publication line: a WN on Narō, an LN edition, a translation, a mirr
 | `release_count` | last known release count, nullable | adapter fact |
 | `created_at`, `updated_at` | local timestamps | computed |
 
-`status = completed` is only stored when the source exposes an explicit completion field. Cessation of updates is not completion. `status_source` makes the difference auditable. Absent/unknown values stay nullable.
+`status = completed` is only stored when the source exposes an explicit completion field. For Narō, the official `end` field maps `0` to completed/short story and `1` to ongoing; missing, null or unsupported values stay `unknown`. Cessation of updates is not completion. `status_source` makes the difference auditable. Absent/unknown values stay nullable.
 
 ## Source
 

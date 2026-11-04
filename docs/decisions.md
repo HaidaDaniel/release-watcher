@@ -109,3 +109,11 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Status: Accepted and implemented by task 0007
 - Decision: `backup` runs `VACUUM INTO` for a consistent SQLite copy and writes one ZIP archive with a manifest (format version, schema version, app version, size, SHA-256). The live store is not copied by file-copy while WAL is active. `restore` acquires the same process lock as scans/notify, validates archive structure, size, hash and schema read-only, refuses a schema newer than the binary, and replaces the database through a staged rename with the previous file kept aside until success. It requires `--force` when a database exists.
 - Consequences: Backup/restore are ordinary CLI operations and usable without a server. They do not protect against a caller that ignores the lock and opens the database directly; installation docs require stopping the timer and other commands before restore. `doctor` is read-only, reports the schema version without migrating, and uses an immutable open for closed databases so it does not create WAL sidecars and inspects a temporary copy when a WAL is present. The installer renders actual PREFIX/XDG paths into the unit instead of copying `%h` placeholders.
+
+## ADR-0016 — Narō `end` field follows the official mapping
+
+- Date: 2026-11-04
+- Status: Accepted and implemented by task 0011
+- Context: The original adapter inverted the Narō API `end` field (`1` was treated as completed), so an ongoing work such as `N2166FE` could be reported as completed. The official specification at `https://dev.syosetu.com/man/api/` defines `0` as a short story or completed work and `1` as ongoing.
+- Decision: Map `end=0` to `completed`, `end=1` to `ongoing`, and a missing, `null` or unsupported value to `unknown` with no `status_source`. Never infer completion from inactivity. A `completed` watch stays enabled because an author may resume publication.
+- Consequences: Status-change events follow the real source transitions, including `ongoing → completed → ongoing`. Fixtures and JSON examples use the corrected semantics. Unknown values are not guessed.

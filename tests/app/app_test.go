@@ -416,7 +416,7 @@ func TestMetadataAndStatusChanges(t *testing.T) {
 		t.Fatalf("event types = %v", types)
 	}
 	show, _ := env.svc.Show(ctx, added.WatchID)
-	if show.Work.OriginalTitle != "新しい題名" || show.Publication.Status != "ongoing" {
+	if show.Work.OriginalTitle != "新しい題名" || show.Publication.Status != "completed" {
 		t.Fatalf("show = %+v / %+v", show.Work, show.Publication)
 	}
 }
@@ -502,6 +502,55 @@ func TestMetadataEventPayloadUsesNewTitle(t *testing.T) {
 			t.Fatalf("metadata event title = %q", doc.Work.OriginalTitle)
 		}
 	}
+}
+
+func TestNaroStatusTransitionsOngoingCompletedOngoing(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	clock := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	env.svc.SetNow(func() time.Time { return clock })
+	added := addNaro(t, env, nil)
+
+	show, _ := env.svc.Show(ctx, added.WatchID)
+	if show.Publication.Status != "ongoing" {
+		t.Fatalf("initial status = %q, want ongoing (end=1)", show.Publication.Status)
+	}
+
+	n.setMeta("テスト作品", 0)
+	clock = clock.Add(time.Minute)
+	scanID(t, env, added.WatchID)
+	show, _ = env.svc.Show(ctx, added.WatchID)
+	if show.Publication.Status != "completed" {
+		t.Fatalf("after end=0 status = %q, want completed", show.Publication.Status)
+	}
+
+	n.setMeta("テスト作品", 1)
+	clock = clock.Add(time.Minute)
+	scanID(t, env, added.WatchID)
+	show, _ = env.svc.Show(ctx, added.WatchID)
+	if show.Publication.Status != "ongoing" {
+		t.Fatalf("after end=1 status = %q, want ongoing", show.Publication.Status)
+	}
+
+	var transitions []string
+	for _, doc := range decodeEvents(t, mustEvents(t, env)) {
+		if doc.EventType == "publication.status_changed" {
+			transitions = append(transitions, doc.EventID)
+		}
+	}
+	if len(transitions) != 2 {
+		t.Fatalf("status transitions = %d, want 2", len(transitions))
+	}
+}
+
+func mustEvents(t *testing.T, env *testEnv) *app.EventsResult {
+	t.Helper()
+	events, err := env.svc.Events(context.Background(), app.EventQuery{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return events
 }
 
 func TestRepeatedStatusTransitionsAreNotDropped(t *testing.T) {
