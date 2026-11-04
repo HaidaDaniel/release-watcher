@@ -1,11 +1,14 @@
 [Unit]
-Description=Run Release Watcher due scan hourly
+Description=Run Release Watcher due scan daily
 Documentation=https://github.com/HaidaDaniel/release-watcher
 
 [Timer]
-OnCalendar=hourly
+# Local time. One run per day is enough for the default 24h watch interval.
+# Shorten this when you configure shorter per-watch intervals; doctor warns
+# when the timer cadence cannot honor the shortest enabled interval.
+OnCalendar=*-*-* 04:15:00
 Persistent=true
-RandomizedDelaySec=5m
+RandomizedDelaySec=15m
 Unit=release-watcher.service
 
 [Install]

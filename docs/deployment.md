@@ -34,7 +34,7 @@ systemctl --user list-timers release-watcher.timer
 systemctl --user enable --now release-watcher.timer
 ```
 
-The timer runs hourly with `Persistent=true`, so a missed run is recovered. `scan --due` is a cheap no-op when no watch is due. The default interval is 24h; if a watch uses a shorter interval, the timer must run at least that often. Change `OnCalendar` in the timer unit and reload it:
+The timer runs once per day at 04:15 local time with `Persistent=true`, so a missed run is recovered after boot or downtime. `scan --due` is a cheap no-op when no watch is due. The default interval is 24h; if a watch uses a shorter interval, the timer must run at least that often. Change `OnCalendar` in the timer unit and reload it:
 
 ```sh
 systemctl --user edit release-watcher.timer
@@ -42,7 +42,18 @@ systemctl --user daemon-reload
 systemctl --user restart release-watcher.timer
 ```
 
-There is no promise that a 6h interval is honored by a daily timer. The timer frequency is part of the installation contract.
+There is no promise that a 6h interval is honored by a daily timer. The timer frequency is part of the installation contract. `release-watcher doctor --json` reads the installed user timer and warns when its cadence is slower than the shortest enabled watch interval, or when the timer unit cannot be found or parsed.
+
+### User lingering and reboot recovery
+
+The timer is user-level. Without lingering, systemd starts it only while the user has a session. For a home server that reboots without an interactive login, enable lingering explicitly after reviewing the security implications:
+
+```sh
+sudo loginctl enable-linger "$USER"
+loginctl show-user "$USER" -p Linger
+```
+
+The installer does not enable lingering automatically; it prints the command when lingering is off. With lingering enabled, the daily timer and `Persistent=true` recover missed runs after reboot. Test this in an isolated user environment before relying on it. Use `systemctl --user list-timers release-watcher.timer` and `journalctl --user -u release-watcher.service` to diagnose scheduling.
 
 ## Configuration
 
@@ -82,7 +93,7 @@ Restore acquires the same process lock as scans/notify, validates the archive, s
 
 ## Doctor
 
-`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings and build identity. It does not create or migrate the database. On a closed database it opens with `immutable=1`, so it does not create `-wal`/`-shm` sidecars; if a WAL exists it inspects a temporary copy, leaving the live files untouched. Stop writers when an authoritative schema/permission check is required.
+`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings, build identity and the installed user timer cadence against the shortest enabled watch interval. It does not create or migrate the database. On a closed database it opens with `immutable=1`, so it does not create `-wal`/`-shm` sidecars; if a WAL exists it inspects a temporary copy, leaving the live files untouched. Stop writers when an authoritative schema/permission check is required.
 
 ## Local verification evidence
 

@@ -117,3 +117,11 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Context: The original adapter inverted the Narō API `end` field (`1` was treated as completed), so an ongoing work such as `N2166FE` could be reported as completed. The official specification at `https://dev.syosetu.com/man/api/` defines `0` as a short story or completed work and `1` as ongoing.
 - Decision: Map `end=0` to `completed`, `end=1` to `ongoing`, and a missing, `null` or unsupported value to `unknown` with no `status_source`. Never infer completion from inactivity. A `completed` watch stays enabled because an author may resume publication.
 - Consequences: Status-change events follow the real source transitions, including `ongoing → completed → ongoing`. Fixtures and JSON examples use the corrected semantics. Unknown values are not guessed.
+
+## ADR-0017 — Daily user timer with an explicit cadence check
+
+- Date: 2026-11-04
+- Status: Accepted and implemented by task 0013
+- Context: The default watch interval is 24h, but the shipped timer ran hourly. Hourly wake-ups add noise and battery/IO cost without improving the default experience. A user-level timer also needs explicit lingering guidance for machines that reboot without a login.
+- Decision: Ship one user-level timer at `OnCalendar=*-*-* 04:15:00` local time with `Persistent=true`, `RandomizedDelaySec=15m` and a oneshot service. Do not enable lingering automatically. `doctor` reads the installed timer, compares its cadence with the shortest enabled watch interval, and warns with an override hint when the timer is too slow or cannot be parsed.
+- Consequences: Default installations check once per day and recover missed runs. Users who configure shorter intervals must edit `OnCalendar` or accept delayed checks. The installer prints the explicit `loginctl enable-linger` command when lingering is off.

@@ -33,7 +33,7 @@ func TestSystemdUnitsAndInstallScript(t *testing.T) {
 			t.Fatalf("service missing %q", want)
 		}
 	}
-	for _, want := range []string{"OnCalendar=hourly", "Persistent=true", "WantedBy=timers.target"} {
+	for _, want := range []string{"OnCalendar=*-*-* 04:15:00", "Persistent=true", "RandomizedDelaySec=15m", "WantedBy=timers.target"} {
 		if !strings.Contains(string(timer), want) {
 			t.Fatalf("timer missing %q", want)
 		}
@@ -49,7 +49,7 @@ func TestSystemdUnitsAndInstallScript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"release-watcher.service", "release-watcher.timer", "release-watcher doctor"} {
+	for _, want := range []string{"release-watcher.service", "release-watcher.timer", "release-watcher doctor", "loginctl enable-linger"} {
 		if !strings.Contains(string(installScript), want) {
 			t.Fatalf("install script missing %q", want)
 		}

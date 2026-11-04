@@ -43,7 +43,7 @@ The model is "run when needed", not "stay alive".
 - `scan --all` is an explicit manual override.
 - `scan --id` processes one watch.
 - A process-local file lock prevents overlapping scans; SQLite provides the durable transaction boundary.
-- The shipped systemd timer runs hourly and `--due` is a cheap no-op when nothing is due. A daily timer is sufficient for the default 24h interval; a shorter interval needs a correspondingly more frequent timer. The installation docs state this explicitly.
+- The shipped user systemd timer runs once per day at 04:15 local time with `Persistent=true`, and `--due` is a cheap no-op when nothing is due. A daily timer is sufficient for the default 24h interval; a shorter interval needs a correspondingly more frequent timer. `doctor` warns when the installed timer cadence is slower than the shortest enabled watch interval. The installation docs state this explicitly.
 
 ## Storage
 

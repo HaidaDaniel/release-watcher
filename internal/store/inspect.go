@@ -51,7 +51,7 @@ func InspectSchema(ctx context.Context, path string) (int, error) {
 	return inspectPath(ctx, abs)
 }
 
-func inspectPath(ctx context.Context, abs string) (int, error) {
+func openReadOnly(ctx context.Context, abs string) (*sql.DB, error) {
 	u := url.URL{Scheme: "file", Path: abs}
 	q := u.Query()
 	q.Set("mode", "ro")
@@ -62,12 +62,21 @@ func inspectPath(ctx context.Context, abs string) (int, error) {
 	u.RawQuery = q.Encode()
 	db, err := sql.Open("sqlite", u.String())
 	if err != nil {
-		return 0, fmt.Errorf("store: open read-only: %w", err)
+		return nil, fmt.Errorf("store: open read-only: %w", err)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("store: ping read-only: %w", err)
+	}
+	return db, nil
+}
+
+func inspectPath(ctx context.Context, abs string) (int, error) {
+	db, err := openReadOnly(ctx, abs)
+	if err != nil {
+		return 0, err
 	}
 	defer db.Close()
-	if err := db.PingContext(ctx); err != nil {
-		return 0, fmt.Errorf("store: ping read-only: %w", err)
-	}
 	var present int
 	if err := db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'`,
@@ -84,6 +93,66 @@ func inspectPath(ctx context.Context, abs string) (int, error) {
 		return 0, fmt.Errorf("store: read schema version: %w", err)
 	}
 	return version, nil
+}
+
+// InspectWatchIntervals returns the shortest enabled watch interval and the
+// number of enabled watches without writing or migrating the database.
+func InspectWatchIntervals(ctx context.Context, path string) (int64, int, error) {
+	if path == "" {
+		return 0, 0, errors.New("store: empty database path")
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return 0, 0, err
+	}
+	if _, err := os.Stat(abs); err != nil {
+		return 0, 0, err
+	}
+	if _, err := os.Stat(abs + "-wal"); err == nil {
+		tmpDir, err := os.MkdirTemp("", "release-watcher-inspect-*")
+		if err != nil {
+			return 0, 0, fmt.Errorf("store: create inspection directory: %w", err)
+		}
+		defer os.RemoveAll(tmpDir)
+		tmpDB := filepath.Join(tmpDir, "inspect.db")
+		if err := copyFile(abs, tmpDB); err != nil {
+			return 0, 0, fmt.Errorf("store: copy database for inspection: %w", err)
+		}
+		for _, suffix := range []string{"-wal", "-shm"} {
+			if _, statErr := os.Stat(abs + suffix); statErr == nil {
+				if err := copyFile(abs+suffix, tmpDB+suffix); err != nil {
+					return 0, 0, fmt.Errorf("store: copy database sidecar for inspection: %w", err)
+				}
+			}
+		}
+		return inspectWatchIntervalsPath(ctx, tmpDB)
+	}
+	return inspectWatchIntervalsPath(ctx, abs)
+}
+
+func inspectWatchIntervalsPath(ctx context.Context, abs string) (int64, int, error) {
+	db, err := openReadOnly(ctx, abs)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer db.Close()
+	var present int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'watch'`,
+	).Scan(&present); err != nil {
+		return 0, 0, fmt.Errorf("store: inspect watch table: %w", err)
+	}
+	if present == 0 {
+		return 0, 0, nil
+	}
+	var minInterval int64
+	var enabled int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COALESCE(MIN(interval_seconds), 0), COUNT(*) FROM watch WHERE enabled = 1`,
+	).Scan(&minInterval, &enabled); err != nil {
+		return 0, 0, fmt.Errorf("store: inspect watch intervals: %w", err)
+	}
+	return minInterval, enabled, nil
 }
 
 func copyFile(src, dst string) error {

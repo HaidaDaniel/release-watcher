@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/HaidaDaniel/release-watcher/internal/app"
 	"github.com/HaidaDaniel/release-watcher/internal/buildinfo"
@@ -382,6 +383,28 @@ func (r *runner) doctor(ctx context.Context, args []string) int {
 		add("ci", "ok", "no GitHub Actions workflow (intentional before MVP)")
 	}
 
+	minInterval, enabledWatches, watchErr := store.InspectWatchIntervals(ctx, cfg.DBPath)
+	timerPath, timerCadence, timerFound, timerKnown := findUserTimer(r.getenv)
+	switch {
+	case watchErr != nil && os.IsNotExist(watchErr):
+		add("schedule", "warn", "database is not initialized yet; timer cadence cannot be compared with watch intervals")
+	case watchErr != nil:
+		add("schedule", "warn", "cannot inspect enabled watch intervals: "+watchErr.Error())
+	case enabledWatches == 0:
+		add("schedule", "ok", "no enabled watches; timer cadence does not constrain scans")
+	case !timerFound:
+		add("schedule", "warn", "user timer unit was not found; install it with scripts/install.sh --enable")
+	case !timerKnown:
+		add("schedule", "warn", "cannot determine timer cadence from "+timerPath+"; edit OnCalendar or check systemd overrides")
+	default:
+		shortest := time.Duration(minInterval) * time.Second
+		if shortest < timerCadence {
+			add("schedule", "warn", fmt.Sprintf("timer runs every %s but the shortest enabled watch interval is %s; edit OnCalendar and reload the timer", timerCadence, shortest))
+		} else {
+			add("schedule", "ok", fmt.Sprintf("timer cadence %s covers the shortest enabled watch interval %s", timerCadence, shortest))
+		}
+	}
+
 	healthy := true
 	for _, c := range checks {
 		if c.Status == "error" {
@@ -407,6 +430,68 @@ func (r *runner) doctor(ctx context.Context, args []string) int {
 		return ExitError
 	}
 	return ExitOK
+}
+
+func findUserTimer(getenv func(string) string) (path string, cadence time.Duration, found, known bool) {
+	var candidates []string
+	if xdg := strings.TrimSpace(getenv("XDG_CONFIG_HOME")); xdg != "" {
+		candidates = append(candidates, filepath.Join(xdg, "systemd", "user", "release-watcher.timer"))
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidates = append(candidates, filepath.Join(home, ".config", "systemd", "user", "release-watcher.timer"))
+	}
+	for _, dir := range strings.Split(getenv("XDG_CONFIG_DIRS"), ":") {
+		if strings.TrimSpace(dir) != "" {
+			candidates = append(candidates, filepath.Join(dir, "systemd", "user", "release-watcher.timer"))
+		}
+	}
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		if seen[candidate] {
+			continue
+		}
+		seen[candidate] = true
+		data, err := os.ReadFile(candidate)
+		if err != nil {
+			continue
+		}
+		duration, ok := parseTimerCadence(string(data))
+		return candidate, duration, true, ok
+	}
+	return "", 0, false, false
+}
+
+func parseTimerCadence(unit string) (time.Duration, bool) {
+	for _, raw := range strings.Split(unit, "\n") {
+		line := strings.TrimSpace(raw)
+		if !strings.HasPrefix(line, "OnCalendar=") {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(line, "OnCalendar="))
+		switch value {
+		case "hourly":
+			return time.Hour, true
+		case "daily":
+			return 24 * time.Hour, true
+		case "weekly":
+			return 7 * 24 * time.Hour, true
+		}
+		fields := strings.Fields(value)
+		if len(fields) == 2 && fields[0] == "*-*-*" {
+			clock := fields[1]
+			switch {
+			case strings.HasPrefix(clock, "*:0/"):
+				if minutes, err := strconv.Atoi(strings.TrimPrefix(clock, "*:0/")); err == nil && minutes > 0 {
+					return time.Duration(minutes) * time.Minute, true
+				}
+			case strings.HasPrefix(clock, "*:"):
+				return time.Hour, true
+			case strings.Count(clock, ":") == 2:
+				return 24 * time.Hour, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func gitOutput(ctx context.Context, dir string, args ...string) string {

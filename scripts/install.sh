@@ -73,7 +73,16 @@ fi
 echo "Installed: $prefix/bin/release-watcher"
 echo "Units:     $unit_dir/release-watcher.service, $unit_dir/release-watcher.timer"
 echo "State:     $state_dir"
+echo "Schedule:  daily at 04:15 local time (Persistent=true)"
 if ! $enable; then
   echo "Next:      systemctl --user enable --now release-watcher.timer"
+fi
+if command -v loginctl >/dev/null 2>&1; then
+  linger=$(loginctl show-user "${USER:-$(id -un)}" -p Linger --value 2>/dev/null || true)
+  if [[ "$linger" != "yes" ]]; then
+    echo "Note:      user lingering is disabled; the timer only runs while this user is logged in."
+    echo "           Enable it explicitly if the machine reboots without an interactive login:"
+    echo "           sudo loginctl enable-linger ${USER:-$(id -un)}"
+  fi
 fi
 echo "Check:     release-watcher doctor --json"

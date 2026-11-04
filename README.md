@@ -1,6 +1,6 @@
 # Release Watcher
 
-A small self-hosted watcher for new chapters and volumes from public sources. One Go binary, SQLite state, a CLI and an optional systemd timer (hourly by default, with a 24h default check interval). No server, no Docker, no LLM during scans.
+A small self-hosted watcher for new chapters and volumes from public sources. One Go binary, SQLite state, a CLI and an optional daily systemd timer (with a 24h default check interval). No server, no Docker, no LLM during scans.
 
 Status: MVP vertical slice plus notifications and local installation. Add a source, store a silent baseline, scan for new chapters, read events, use stable JSON from any agent, optionally receive grouped Telegram messages, and back up/restore state. A live production deploy is not claimed. See [docs/progress.md](docs/progress.md).
 
@@ -47,6 +47,8 @@ pnpm exec lefthook install
 scripts/verify-fast.sh
 scripts/verify-push.sh
 ```
+
+The user systemd timer runs daily at 04:15 local time with `Persistent=true`; see [deployment](docs/deployment.md) for shorter-interval overrides and `loginctl enable-linger`.
 
 Node.js and pnpm are required only for the development workflow, never for production. `scripts/verify-push.sh` fails clearly when pnpm is missing instead of skipping APK lint. The secret scanner reports only file, line and secret type; it is an accident guard, not a Git-history audit.
 
