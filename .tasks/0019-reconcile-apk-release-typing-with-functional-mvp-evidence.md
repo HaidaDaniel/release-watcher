@@ -1,6 +1,6 @@
 # Task 0019 - Reconcile APK release typing with functional-MVP evidence
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: planning
