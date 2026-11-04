@@ -1,7 +1,7 @@
 # Task 0015 - Live source acceptance and end-to-end regression
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: verification
 Type: test
@@ -35,6 +35,7 @@ Run a polite live Narō smoke test against N2166FE and an isolated local end-to-
 - internal/notifier/**
 - internal/store/**
 - internal/source/**
+- internal/config/**
 - docs/progress.md
 - docs/integration-contract.md
 - README.md
