@@ -1,6 +1,6 @@
 # Task 0005 - Vertical slice: scan detection, application use cases and CLI JSON
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
