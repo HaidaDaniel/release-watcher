@@ -1,7 +1,7 @@
 # Task 0016 - MVP acceptance and operational readiness
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: verification
 Type: release
