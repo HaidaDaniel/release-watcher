@@ -28,7 +28,7 @@ Exit: state survives restart; migrations are append-only; dedupe and baseline ar
 - Scan comparison, event creation, independent per-watch errors.
 - CLI `add`, `list`, `show`, `scan`, `events`, `pause`, `resume`, `interval`, `remove` with stable JSON.
 
-Exit: add `https://ncode.syosetu.com/n2166fe/`, baseline without a false notification, detect a fixture new chapter, read the event through CLI JSON. Reached with fixture HTTP servers; the live Narō smoke remains a separate polite check.
+Exit: add `https://ncode.syosetu.com/n2166fe/`, baseline without a false notification, detect a fixture new chapter, read the event through CLI JSON. The live Narō smoke now also passes against the real source.
 
 ## Stage 3 — Notifications (task 0006) — done
 
@@ -45,13 +45,24 @@ Exit: a failed Telegram request is retried and a successful event produces exact
 - systemd timer installation and docs; build linux/amd64 and linux/arm64.
 - Whoosh Core assessment and deployment spike plan/backlog.
 
-Exit: backup/restore, doctor, local binary smoke and static systemd verification are done. A live-schema acceptance run on a host, the polite Narō smoke and the first Whoosh deployment remain separate tasks and are not claimed.
+Exit: backup/restore, doctor, local binary smoke, static systemd verification and the polite Narō smoke are done. A live-schema acceptance run on a real host and the first Whoosh deployment remain separate tasks and are not claimed.
 
 ## Stage 5 — Media Core documentation (separate repository) — done
 
 - README, AGENTS, project/scope/architecture/domain-model/roadmap/integration-contract.
 - ContentReference/ContentAsset/ContentProvider/DeliveryTarget concept only; no business logic.
 - Contract aligned with Release Watcher events.
+
+## Stage 6 — Corrective MVP hardening and acceptance (tasks 0011–0016) — functional MVP done
+
+- Correct Narō `end` semantics (`0` completed/short story, `1` ongoing, unknown otherwise).
+- Repository hygiene, non-leaking secret scanner and mandatory pnpm/APK lint on pre-push.
+- Daily persistent user timer, drop-in-aware doctor cadence check and lingering guidance.
+- Unwatch preserves history; `purge` is the explicit destructive operation.
+- Polite live Narō smoke, isolated E2E with Telegram outbox/retry and two-watch isolation.
+- Full acceptance matrix: tests, race, vet, builds, backup/restore, doctor, systemd, JSON purity, lock/signal/timeout.
+
+Exit: functional MVP passes locally. Deployed MVP remains blocked until a real Linux host is provided and the Whoosh spike is executed.
 
 ## Deferred backlog
 

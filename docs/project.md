@@ -1,6 +1,6 @@
 # Release Watcher
 
-Status: MVP vertical slice plus notifications and local installation. The repository foundation, SQLite persistence, Narō/RSS/Atom adapters, scan detection, CLI vertical slice, optional durable Telegram outbox, backup/restore, read-only doctor, user systemd units and Linux builds are implemented. A live deployment and the Whoosh spike remain planned; this document separates those states explicitly.
+Status: Functional MVP implemented and tested locally. The repository foundation, SQLite persistence (schema 2), Narō/RSS/Atom adapters, scan detection, CLI vertical slice, optional durable Telegram outbox, backup/restore, read-only doctor, daily user systemd timer, unwatch/purge history semantics and Linux builds are implemented. The live Narō smoke and isolated end-to-end regression pass. A deployed MVP on a real Linux host and the Whoosh spike remain planned/blocked; this document separates those states explicitly.
 
 ## Mission
 
@@ -45,12 +45,15 @@ release-watcher scan --due
 | SQLite domain storage and migrations | implemented |
 | Narō adapter and baseline detection | implemented |
 | RSS/Atom adapter | implemented |
-| `add`, `list`, `show`, `scan`, `events`, pause/resume/interval/remove | implemented |
+| `add`, `list`, `show`, `scan`, `events`, pause/resume/interval/remove/purge | implemented |
 | Telegram outbox, retries and RU/EN messages | implemented |
 | Doctor (foundation config/environment checks) | implemented |
 | Backup/restore and atomic restore validation | implemented |
-| systemd units and user install script | implemented (static/local proof) |
-| Whoosh Core deployment spike | assessed, not executed |
+| systemd daily timer, user install script and lingering guidance | implemented and statically verified |
+| Live Narō smoke and isolated E2E (210→212, Telegram, retries) | tested |
+| Functional MVP acceptance matrix | tested |
+| Deployed MVP on a real Linux host | not deployed; no test host provided |
+| Whoosh Core deployment spike | assessed, blocked on a real test host |
 | Media Core documentation | done in separate repository (docs only) |
 
 ## Boundary

@@ -30,6 +30,8 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Read-only, schema-aware doctor without implicit migration.
 - User-level install script and systemd service/timer installation path with a daily persistent timer, XDG rendering and explicit lingering guidance.
 - Linux amd64 and arm64 builds; static systemd verification and local binary smoke checks.
+- Narō `end` mapping corrected to the official specification; unwatch preserves history and `purge` is explicit; daily persistent timer and doctor cadence check; non-leaking secret scanner and mandatory APK lint.
+- Live Narō smoke and isolated E2E regression are implemented and pass.
 
 ## Tested
 
@@ -45,14 +47,22 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Installation tests: daily timer cadence, timer drop-ins and calendar-step parsing, doctor schedule warning, and lingering guidance: see task 0013 evidence.
 - Installation tests: backup/restore round-trip, force/exclusivity, bad/missing manifest hash or size, newer/empty schema, sidecar cleanup, symlink/hardlink backup-target rejection, database/archive permissions, doctor schema/newer-schema/read-only sidecar behavior, systemd verification, install rendering with XDG/special paths: see task 0007 evidence.
 - Linux amd64/arm64 builds and local binary smoke checks are recorded in docs/deployment.md.
+- MVP acceptance matrix: `go test ./...`, `go test -race ./...`, `go vet ./...`, `go build ./...`, `scripts/verify-push.sh`, `pnpm exec apkit lint`, linux/amd64 and linux/arm64 builds, release build identity, backup/restore with real data, doctor schema check, systemd unit validation, live Narō smoke, isolated E2E and JSON stdout purity.
+- Signal/timeout/lock acceptance: a second concurrent scan exits 4 with a JSON `locked` error; SIGINT ends the scan with a partial-failure JSON envelope and exit 3; an external timeout terminates the process; a later run succeeds.
 
 ## Deployed
 
-- Not deployed to a production host. Linux binaries were built locally, the amd64 binary was smoke-checked, and systemd units were statically verified.
+- Functional MVP: verified locally, including the live Narō smoke and isolated E2E.
+- Deployed MVP: not deployed. Linux binaries were built locally, the amd64 binary was smoke-checked, and systemd units were statically verified. No real Linux host was provided for installation, reboot/linger verification, or the Whoosh spike.
 
 ## Blocked
 
-- Whoosh Core live deployment: no test host; assessment documented but not executed. Separate backlog task.
+- Whoosh Core live deployment: no test host; assessment documented but not executed. Task 0008 remains blocked pending a real test host and explicit deployment permission.
+- Deployed MVP: blocked on the same host/deployment prerequisite. Do not treat the local functional MVP as a production deployment.
+
+## APK process note
+
+Tasks 0003–0007 were recorded with `Depends on: none` even though their work was sequential. Their history and candidate-bound evidence are not rewritten. Corrective tasks 0011–0016 declare their real dependencies (`0007 -> 0011..0014 -> 0015 -> 0016 -> 0008`), and 0008 now depends on 0016. Some corrective tasks needed an append-only APK epoch because their claim baseline was captured after edits; the predecessor history remains visible and no old evidence was copied.
 
 ## Next step
 

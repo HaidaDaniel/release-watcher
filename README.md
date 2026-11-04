@@ -2,7 +2,7 @@
 
 A small self-hosted watcher for new chapters and volumes from public sources. One Go binary, SQLite state, a CLI and an optional daily systemd timer (with a 24h default check interval). No server, no Docker, no LLM during scans.
 
-Status: MVP vertical slice plus notifications and local installation. Add a source, store a silent baseline, scan for new chapters, read events, use stable JSON from any agent, optionally receive grouped Telegram messages, and back up/restore state. A live production deploy is not claimed. See [docs/progress.md](docs/progress.md).
+Status: functional MVP implemented and tested locally. Add a source, store a silent baseline, scan for new chapters, read events, use stable JSON from any agent, optionally receive grouped Telegram messages, remove a watch without losing history, and back up/restore state. The live Narō smoke and isolated E2E pass. A deployed MVP on a real Linux host is not claimed. See [docs/progress.md](docs/progress.md).
 
 ## Build from source
 
@@ -23,6 +23,8 @@ release-watcher list --json
 release-watcher scan --due --json
 release-watcher events --json
 release-watcher show <watch-id> --json
+release-watcher remove <watch-id> --yes   # keep history
+release-watcher purge <watch-id> --yes    # destructive
 ```
 
 The first `add` stores a baseline, so an old 210-chapter work does not produce a false "210 new chapters" event.
