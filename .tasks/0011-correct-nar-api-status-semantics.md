@@ -84,7 +84,6 @@ Implement the official Narō API end semantics (0=completed/short story, 1=ongoi
 ## Verification
 
 - `{"id":"push-checks","type":"automated","required":true,"environment":"local","profile":"deterministic","command":"scripts/verify-push.sh","evidenceRef":"local scripts/verify-push.sh run"}`
-- `{"id":"pre-fix-observation","type":"manual","required":true,"environment":"local","profile":"trusted","instruction":"Record the baseline inverted end mapping and the live N2166FE end=1 observation.","evidenceRef":"baseline c172aad end mapping and live Narō API observation"}`
 
 ## Documentation updates
 
