@@ -1,6 +1,6 @@
 # Task 0011 - Correct Narō API status semantics
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
