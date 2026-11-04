@@ -42,7 +42,7 @@ systemctl --user daemon-reload
 systemctl --user restart release-watcher.timer
 ```
 
-There is no promise that a 6h interval is honored by a daily timer. The timer frequency is part of the installation contract. `release-watcher doctor --json` reads the installed user timer and warns when its cadence is slower than the shortest enabled watch interval, or when the timer unit cannot be found or parsed.
+There is no promise that a 6h interval is honored by a daily timer. The timer frequency is part of the installation contract. `release-watcher doctor --json` reads the installed user timer, including `release-watcher.timer.d/*.conf` drop-ins, and warns when its cadence is slower than the shortest enabled watch interval, or when the timer unit cannot be found or parsed. Supported calendar forms include aliases (`hourly`, `daily`, `weekly`), daily clock times, hour/minute steps and weekday-prefixed schedules.
 
 ### User lingering and reboot recovery
 

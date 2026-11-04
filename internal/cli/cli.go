@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -433,65 +434,179 @@ func (r *runner) doctor(ctx context.Context, args []string) int {
 }
 
 func findUserTimer(getenv func(string) string) (path string, cadence time.Duration, found, known bool) {
-	var candidates []string
-	if xdg := strings.TrimSpace(getenv("XDG_CONFIG_HOME")); xdg != "" {
-		candidates = append(candidates, filepath.Join(xdg, "systemd", "user", "release-watcher.timer"))
-	}
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		candidates = append(candidates, filepath.Join(home, ".config", "systemd", "user", "release-watcher.timer"))
-	}
-	for _, dir := range strings.Split(getenv("XDG_CONFIG_DIRS"), ":") {
-		if strings.TrimSpace(dir) != "" {
-			candidates = append(candidates, filepath.Join(dir, "systemd", "user", "release-watcher.timer"))
-		}
-	}
-	seen := map[string]bool{}
-	for _, candidate := range candidates {
-		if seen[candidate] {
-			continue
-		}
-		seen[candidate] = true
+	dirs := systemdUserUnitDirs(getenv)
+	var mainPath, mainContent string
+	for _, dir := range dirs {
+		candidate := filepath.Join(dir, "release-watcher.timer")
 		data, err := os.ReadFile(candidate)
+		if err == nil {
+			mainPath = candidate
+			mainContent = string(data)
+			break
+		}
+	}
+	if mainPath == "" {
+		return "", 0, false, false
+	}
+
+	dropIns := map[string]string{}
+	var names []string
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(filepath.Join(dir, "release-watcher.timer.d"))
 		if err != nil {
 			continue
 		}
-		duration, ok := parseTimerCadence(string(data))
-		return candidate, duration, true, ok
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".conf") {
+				continue
+			}
+			if _, exists := dropIns[entry.Name()]; exists {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(dir, "release-watcher.timer.d", entry.Name()))
+			if err != nil {
+				continue
+			}
+			dropIns[entry.Name()] = string(data)
+			names = append(names, entry.Name())
+		}
 	}
-	return "", 0, false, false
+	sort.Strings(names)
+	content := mainContent
+	for _, name := range names {
+		content += "\n" + dropIns[name]
+	}
+	duration, ok := parseTimerCadence(content)
+	return mainPath, duration, true, ok
+}
+
+func systemdUserUnitDirs(getenv func(string) string) []string {
+	var dirs []string
+	if xdg := strings.TrimSpace(getenv("XDG_CONFIG_HOME")); xdg != "" {
+		dirs = append(dirs, filepath.Join(xdg, "systemd", "user"))
+	} else if home, err := os.UserHomeDir(); err == nil && home != "" {
+		dirs = append(dirs, filepath.Join(home, ".config", "systemd", "user"))
+	}
+	for _, dir := range strings.Split(getenv("XDG_CONFIG_DIRS"), ":") {
+		if strings.TrimSpace(dir) != "" {
+			dirs = append(dirs, filepath.Join(dir, "systemd", "user"))
+		}
+	}
+	dirs = append(dirs, "/etc/systemd/user", "/usr/lib/systemd/user")
+	seen := map[string]bool{}
+	out := make([]string, 0, len(dirs))
+	for _, dir := range dirs {
+		if seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		out = append(out, dir)
+	}
+	return out
 }
 
 func parseTimerCadence(unit string) (time.Duration, bool) {
+	var cadences []time.Duration
 	for _, raw := range strings.Split(unit, "\n") {
 		line := strings.TrimSpace(raw)
-		if !strings.HasPrefix(line, "OnCalendar=") {
+		if line == "" || strings.HasPrefix(line, "#") || !strings.HasPrefix(line, "OnCalendar=") {
 			continue
 		}
 		value := strings.TrimSpace(strings.TrimPrefix(line, "OnCalendar="))
-		switch value {
-		case "hourly":
-			return time.Hour, true
-		case "daily":
-			return 24 * time.Hour, true
-		case "weekly":
-			return 7 * 24 * time.Hour, true
+		if value == "" {
+			cadences = nil
+			continue
 		}
-		fields := strings.Fields(value)
-		if len(fields) == 2 && fields[0] == "*-*-*" {
-			clock := fields[1]
-			switch {
-			case strings.HasPrefix(clock, "*:0/"):
-				if minutes, err := strconv.Atoi(strings.TrimPrefix(clock, "*:0/")); err == nil && minutes > 0 {
-					return time.Duration(minutes) * time.Minute, true
-				}
-			case strings.HasPrefix(clock, "*:"):
-				return time.Hour, true
-			case strings.Count(clock, ":") == 2:
-				return 24 * time.Hour, true
-			}
+		if duration, ok := calendarCadence(value); ok {
+			cadences = append(cadences, duration)
+		}
+	}
+	if len(cadences) == 0 {
+		return 0, false
+	}
+	shortest := cadences[0]
+	for _, cadence := range cadences[1:] {
+		if cadence < shortest {
+			shortest = cadence
+		}
+	}
+	return shortest, true
+}
+
+func calendarCadence(value string) (time.Duration, bool) {
+	switch value {
+	case "minutely":
+		return time.Minute, true
+	case "hourly":
+		return time.Hour, true
+	case "daily":
+		return 24 * time.Hour, true
+	case "weekly":
+		return 7 * 24 * time.Hour, true
+	case "monthly":
+		return 30 * 24 * time.Hour, true
+	case "quarterly":
+		return 90 * 24 * time.Hour, true
+	case "semi-annually":
+		return 182 * 24 * time.Hour, true
+	case "yearly", "annually":
+		return 365 * 24 * time.Hour, true
+	}
+
+	fields := strings.Fields(value)
+	weekly := false
+	if len(fields) > 0 && isWeekdayExpression(fields[0]) {
+		weekly = !strings.Contains(fields[0], "..")
+		fields = fields[1:]
+	}
+	if len(fields) == 0 {
+		return 0, false
+	}
+	clock := fields[len(fields)-1]
+	if weekly && !strings.Contains(clock, "/") {
+		return 7 * 24 * time.Hour, true
+	}
+	parts := strings.Split(clock, ":")
+	if len(parts) < 2 {
+		return 0, false
+	}
+	hour, minute := parts[0], parts[1]
+	if idx := strings.IndexByte(hour, '/'); idx >= 0 {
+		if n, err := strconv.Atoi(hour[idx+1:]); err == nil && n > 0 {
+			return time.Duration(n) * time.Hour, true
+		}
+		return 0, false
+	}
+	if idx := strings.IndexByte(minute, '/'); idx >= 0 {
+		if n, err := strconv.Atoi(minute[idx+1:]); err == nil && n > 0 {
+			return time.Duration(n) * time.Minute, true
+		}
+		return 0, false
+	}
+	if hour == "*" {
+		return time.Hour, true
+	}
+	if _, err := strconv.Atoi(hour); err == nil {
+		if _, err := strconv.Atoi(minute); err == nil {
+			return 24 * time.Hour, true
 		}
 	}
 	return 0, false
+}
+
+func isWeekdayExpression(value string) bool {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	if value == "" {
+		return false
+	}
+	for _, part := range strings.Split(value, "..") {
+		switch part {
+		case "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN":
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func gitOutput(ctx context.Context, dir string, args ...string) string {
