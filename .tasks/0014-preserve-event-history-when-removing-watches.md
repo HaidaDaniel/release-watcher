@@ -20,6 +20,7 @@ Change remove/unwatch so it stops tracking but preserves releases, events, deliv
 - AGENTS.md
 - README.md
 - docs/domain-model.md
+- docs/architecture.md
 - docs/integration-contract.md
 - docs/decisions.md
 - docs/progress.md
@@ -35,6 +36,7 @@ Change remove/unwatch so it stops tracking but preserves releases, events, deliv
 - tests/cli/**
 - tests/store/**
 - docs/domain-model.md
+- docs/architecture.md
 - docs/integration-contract.md
 - docs/decisions.md
 - docs/progress.md
@@ -92,6 +94,7 @@ Change remove/unwatch so it stops tracking but preserves releases, events, deliv
 ## Documentation updates
 
 - docs/domain-model.md
+- docs/architecture.md
 - docs/integration-contract.md
 - docs/decisions.md
 - docs/progress.md
