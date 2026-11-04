@@ -51,17 +51,41 @@ func Compare(pub *domain.Publication, watch *domain.Watch, work *domain.Work, sn
 
 	if watch.BaselineEstablishedAt == nil {
 		change.Baseline = true
+		seen := map[string]bool{}
 		for _, r := range snapshot.Releases {
+			if seen[r.ExternalID] {
+				continue
+			}
+			seen[r.ExternalID] = true
 			change.Added = append(change.Added, toDomainRelease(r, pub.ID, now, true))
 		}
 		return change, nil
 	}
 
-	if watch.Mode == domain.ModeCountOnly && snapshot.Mode == domain.ModeCatalog && len(snapshot.Releases) > 0 && len(existing) == 0 {
+	if watch.Mode == domain.ModeCountOnly && snapshot.Mode == domain.ModeCatalog {
+		if len(snapshot.Releases) == 0 || !snapshot.Complete {
+			change.Mode = domain.ModeCountOnly
+			return change, nil
+		}
 		change.Reconcile = true
 		change.Mode = domain.ModeCatalog
+		byID := map[string]domain.Release{}
+		for _, r := range existing {
+			byID[r.ExternalID] = r
+		}
+		seen := map[string]bool{}
 		for _, r := range snapshot.Releases {
-			change.Added = append(change.Added, toDomainRelease(r, pub.ID, now, true))
+			if seen[r.ExternalID] {
+				continue
+			}
+			seen[r.ExternalID] = true
+			current := toDomainRelease(r, pub.ID, now, true)
+			if previous, ok := byID[r.ExternalID]; ok {
+				current.ID = previous.ID
+				current.FirstSeenAt = previous.FirstSeenAt
+				current.IsBaseline = previous.IsBaseline
+			}
+			change.Added = append(change.Added, current)
 		}
 		return change, nil
 	}
@@ -79,7 +103,8 @@ func Compare(pub *domain.Publication, watch *domain.Watch, work *domain.Work, sn
 		change.NewStatusSource = snapshot.Metadata.StatusSource
 	}
 
-	if snapshot.Mode == domain.ModeCountOnly || (snapshot.Mode == domain.ModeCatalog && len(snapshot.Releases) == 0 && !snapshot.Complete) {
+	isFeed := snapshot.SourceKind == domain.SourceRSS || snapshot.SourceKind == domain.SourceAtom
+	if snapshot.Mode == domain.ModeCountOnly || (snapshot.Mode == domain.ModeCatalog && len(snapshot.Releases) == 0 && !snapshot.Complete && !isFeed) {
 		previous := pub.ReleaseCount
 		if previous == nil {
 			previous = watch.BaselineCount
@@ -92,6 +117,9 @@ func Compare(pub *domain.Publication, watch *domain.Watch, work *domain.Work, sn
 		}
 		return change, nil
 	}
+	if len(snapshot.Releases) == 0 && !snapshot.Complete {
+		return change, nil
+	}
 
 	byID := map[string]domain.Release{}
 	for _, r := range existing {
@@ -99,6 +127,9 @@ func Compare(pub *domain.Publication, watch *domain.Watch, work *domain.Work, sn
 	}
 	seen := map[string]bool{}
 	for _, sr := range snapshot.Releases {
+		if seen[sr.ExternalID] {
+			continue
+		}
 		seen[sr.ExternalID] = true
 		current := toDomainRelease(sr, pub.ID, now, false)
 		previous, ok := byID[sr.ExternalID]
@@ -158,7 +189,6 @@ func toDomainRelease(r source.Release, publicationID string, now time.Time, base
 
 // DedupeKey builds a stable key from the watch, event type and sorted parts.
 func DedupeKey(watchID string, eventType domain.EventType, parts ...string) string {
-	sort.Strings(parts)
 	h := sha256.New()
 	write(h, watchID)
 	write(h, string(eventType))
@@ -179,6 +209,7 @@ func ReleaseParts(releases []domain.Release) []string {
 	for _, r := range releases {
 		parts = append(parts, r.ExternalID+"|"+r.ContentHash)
 	}
+	sort.Strings(parts)
 	return parts
 }
 

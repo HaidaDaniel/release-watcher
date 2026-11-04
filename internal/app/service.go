@@ -126,6 +126,7 @@ func (s *Service) watchView(b *bundle) WatchView {
 		Status:          string(b.publication.Status),
 		StatusKnown:     b.publication.Status != domain.StatusUnknown,
 		StatusSource:    b.publication.StatusSource,
+		LastPublishedAt: b.publication.LastPublishedAt,
 		Enabled:         b.watch.Enabled,
 		IntervalSeconds: b.watch.IntervalSeconds,
 		LastCheckedAt:   b.watch.LastCheckAt,

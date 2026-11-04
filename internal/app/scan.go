@@ -164,14 +164,24 @@ func (s *Service) scanOne(ctx context.Context, watch domain.Watch) (int, string,
 }
 
 func (s *Service) applyBaseline(ctx context.Context, q *store.Queries, b *bundle, snapshot *source.Snapshot, change scan.Change, now, started time.Time) error {
+	if snapshot.Metadata.OriginalTitle != "" && snapshot.Metadata.OriginalTitle != b.work.OriginalTitle {
+		if err := q.UpdateWorkOriginalTitle(ctx, b.work.ID, snapshot.Metadata.OriginalTitle, now); err != nil {
+			return err
+		}
+	}
 	for i := range change.Added {
 		release := change.Added[i]
 		if release.ID == "" {
 			release.ID = id.New("rel")
-		}
-		release.IsBaseline = true
-		if err := q.InsertRelease(ctx, &release); err != nil {
-			return err
+			release.IsBaseline = true
+			if err := q.InsertRelease(ctx, &release); err != nil {
+				return err
+			}
+		} else {
+			release.IsBaseline = true
+			if err := q.UpdateRelease(ctx, &release); err != nil {
+				return err
+			}
 		}
 	}
 	count := int64(len(change.Added))
@@ -179,10 +189,10 @@ func (s *Service) applyBaseline(ctx context.Context, q *store.Queries, b *bundle
 		count = snapshot.Count
 	}
 	nextCheck := now.Add(time.Duration(b.watch.IntervalSeconds) * time.Second)
-	if err := q.UpdateWatchBaseline(ctx, b.watch.ID, now, &count, snapshot.Mode, now); err != nil {
+	if err := q.UpdateWatchBaseline(ctx, b.watch.ID, now, &count, change.Mode, now); err != nil {
 		return err
 	}
-	if err := q.UpdateWatchAfterSuccess(ctx, b.watch.ID, now, now, nextCheck, snapshot.Mode, now); err != nil {
+	if err := q.UpdateWatchAfterSuccess(ctx, b.watch.ID, now, now, nextCheck, change.Mode, now); err != nil {
 		return err
 	}
 	b.publication.Status = snapshot.Metadata.Status
@@ -242,11 +252,12 @@ func (s *Service) applyChange(ctx context.Context, q *store.Queries, b *bundle, 
 		if err := q.UpdateWorkOriginalTitle(ctx, b.work.ID, change.NewTitle, now); err != nil {
 			return 0, "", err
 		}
+		b.work.OriginalTitle = change.NewTitle
 	}
 
 	interval := time.Duration(b.watch.IntervalSeconds) * time.Second
 	nextCheck := now.Add(interval)
-	if err := q.UpdateWatchAfterSuccess(ctx, b.watch.ID, now, now, nextCheck, snapshot.Mode, now); err != nil {
+	if err := q.UpdateWatchAfterSuccess(ctx, b.watch.ID, now, now, nextCheck, change.Mode, now); err != nil {
 		return 0, "", err
 	}
 

@@ -473,3 +473,103 @@ func TestScanIsolatesWatchErrors(t *testing.T) {
 		t.Fatalf("scan = %+v", result)
 	}
 }
+
+func TestDuplicateAddWorksWhenSourceUnavailable(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	added := addNaro(t, env, nil)
+	n.setFailAPI(true)
+	again, err := env.svc.Add(ctx, app.AddInput{URL: naroURL})
+	if err != nil {
+		t.Fatalf("duplicate add failed while source down: %v", err)
+	}
+	if again.Created || again.WatchID != added.WatchID || again.Reason != "already_exists" {
+		t.Fatalf("duplicate add = %+v", again)
+	}
+}
+
+func TestMetadataEventPayloadUsesNewTitle(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	added := addNaro(t, env, nil)
+	n.setMeta("新しい題名", 1)
+	scanID(t, env, added.WatchID)
+	events, _ := env.svc.Events(ctx, app.EventQuery{})
+	for _, doc := range decodeEvents(t, events) {
+		if doc.EventType == "publication.metadata_changed" && doc.Work.OriginalTitle != "新しい題名" {
+			t.Fatalf("metadata event title = %q", doc.Work.OriginalTitle)
+		}
+	}
+}
+
+func TestRepeatedStatusTransitionsAreNotDropped(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	clock := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	env.svc.SetNow(func() time.Time { return clock })
+	added := addNaro(t, env, nil)
+	for _, end := range []int{0, 1, 0} {
+		clock = clock.Add(time.Minute)
+		n.setMeta("テスト作品", end)
+		scanID(t, env, added.WatchID)
+	}
+	events, _ := env.svc.Events(ctx, app.EventQuery{Limit: 100})
+	count := 0
+	for _, doc := range decodeEvents(t, events) {
+		if doc.EventType == "publication.status_changed" {
+			count++
+		}
+	}
+	if count != 3 {
+		t.Fatalf("status events = %d, want 3", count)
+	}
+}
+
+func TestEmptyRSSWindowDoesNotEmitCountEvent(t *testing.T) {
+	r := newRSSFixture(t, rssEntries("A", "B", "C"))
+	env := newTestEnv(t, nil)
+	ctx := context.Background()
+	added, err := env.svc.Add(ctx, app.AddInput{URL: r.server.URL + "/feed.xml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.setEntries(nil)
+	scan := scanID(t, env, added.WatchID)
+	if scan.EventsCreated != 0 {
+		t.Fatalf("empty feed emitted events: %+v", scan)
+	}
+	events, _ := env.svc.Events(ctx, app.EventQuery{})
+	if len(events.Events) != 0 {
+		t.Fatalf("empty feed events = %d", len(events.Events))
+	}
+}
+
+func TestShowReturnsRecentEvents(t *testing.T) {
+	n := newNaroFixture(t, []string{"0"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	added := addNaro(t, env, nil)
+	chapters := []string{"0"}
+	for i := 1; i <= 25; i++ {
+		chapters = append(chapters, "Entry")
+		n.setChapters(chapters)
+		scanID(t, env, added.WatchID)
+	}
+	show, err := env.svc.Show(ctx, added.WatchID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(show.Events) != 20 {
+		t.Fatalf("show events = %d", len(show.Events))
+	}
+	var newest eventDoc
+	if err := json.Unmarshal(show.Events[0], &newest); err != nil {
+		t.Fatal(err)
+	}
+	if len(newest.ReleaseIDs) != 1 || newest.ReleaseIDs[0] != "N2166FE/26" {
+		t.Fatalf("show newest event = %+v", newest.ReleaseIDs)
+	}
+}

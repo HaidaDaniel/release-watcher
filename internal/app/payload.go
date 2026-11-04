@@ -64,7 +64,8 @@ type eventPayload struct {
 
 func (s *Service) buildEvent(b *bundle, eventType domain.EventType, releases []domain.Release, previous, current, delta *int64, metadata *payloadMetadata, parts []string, now time.Time) (*domain.Event, error) {
 	eventID := id.New("evt")
-	dedupeKey := scan.DedupeKey(b.watch.ID, eventType, parts...)
+	dedupeParts := append(append([]string{}, parts...), now.UTC().Format(time.RFC3339Nano))
+	dedupeKey := scan.DedupeKey(b.watch.ID, eventType, dedupeParts...)
 	releaseIDs := make([]string, 0, len(releases))
 	payloadReleases := make([]payloadRelease, 0, len(releases))
 	for _, r := range releases {

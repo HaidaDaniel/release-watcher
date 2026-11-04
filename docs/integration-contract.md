@@ -123,7 +123,7 @@ Success `data`:
 }
 ```
 
-A repeated `add` for the same source line returns `ok: true`, `created: false`, the existing watch, and code `already_exists` in `data.reason` (not an error envelope), so automation can be idempotent. It never creates a second watch or a baseline event.
+A repeated `add` for the same source line returns `ok: true`, `created: false`, the existing watch, and `data.reason = "already_exists"` (not an error envelope), so automation can be idempotent. The existing watch is resolved locally before any network request, so a duplicate add works even when the source is currently unavailable. It never creates a second watch or a baseline event.
 
 ## `list` and `show`
 
@@ -145,6 +145,7 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
       "status": "completed",
       "status_known": true,
       "status_source": "naro:end",
+      "last_published_at": "...",
       "enabled": true,
       "interval_seconds": 86400,
       "last_checked_at": "...",
@@ -217,7 +218,7 @@ One watch failure never prevents the rest. The process exits 3 for a partial fai
 
 Input: `events [--json] [--limit N] [--since RFC3339] [--publication <id>] [--watch <id>] [--after <event-id>]`.
 
-Ordering is stable: `detected_at ASC, event_id ASC`. `--since` is inclusive; `--after` is an opaque cursor for repeated reads. Repeated reads are safe: events are immutable and `event_id` is stable. Consumers should deduplicate by `event_id` even when paging.
+Event listing is ordered `detected_at ASC, event_id ASC`; `show` uses the newest events. The dedupe key includes the detection time so a later legitimate recurrence (for example `ongoing → completed → ongoing → completed`) is not suppressed. State-based replay safety comes from committing each scan and its events atomically; a replayed scan with no new state emits nothing. `--since` is inclusive; `--after` is an opaque cursor for repeated reads. Repeated reads are safe: events are immutable and `event_id` is stable. Consumers should deduplicate by `event_id` even when paging.
 
 ```json
 {
@@ -280,7 +281,7 @@ Event types:
 - `publication.status_changed` — explicit source status changed.
 - `release.count_changed` — count-only source count changed decreasingly or without identities.
 
-Count-only events have `release_ids: []`, a non-null `previous_count`/`current_count`/`count_delta`, and no invented numbers or URLs.
+Count-only events have `release_ids: []`, a non-null `previous_count`/`current_count`/`count_delta`, and no invented numbers or URLs. An empty RSS/Atom window is not a count change and emits no event. A count-only source that recovers to a complete catalog is reconciled silently; a partial recovery stays count-only.
 
 ## `pause`, `resume`, `interval`, `remove`
 

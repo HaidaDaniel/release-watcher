@@ -114,6 +114,9 @@ func TestCLIJSONVerticalSlice(t *testing.T) {
 	if watchID == "" || addData["created"] != true {
 		t.Fatalf("add data = %v", addData)
 	}
+	if addData["last_published_at"] == nil || addData["work_id"] == nil || addData["status_source"] == nil {
+		t.Fatalf("add data missing documented fields: %v", addData)
+	}
 
 	code, stdout, _ = runCLI(t, env, "events", "--json")
 	if code != 0 {

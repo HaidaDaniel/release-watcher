@@ -3,12 +3,14 @@ package app
 import (
 	"context"
 	"errors"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/HaidaDaniel/release-watcher/internal/domain"
 	"github.com/HaidaDaniel/release-watcher/internal/id"
 	"github.com/HaidaDaniel/release-watcher/internal/source"
+	"github.com/HaidaDaniel/release-watcher/internal/source/httpx"
 	"github.com/HaidaDaniel/release-watcher/internal/store"
 )
 
@@ -24,6 +26,10 @@ func (s *Service) Add(ctx context.Context, in AddInput) (*AddResult, *Error) {
 	if strings.TrimSpace(in.URL) == "" {
 		return nil, newError("invalid_url", "a source URL is required", nil)
 	}
+	parsedURL, urlErr := httpx.ValidateURL(in.URL)
+	if urlErr != nil {
+		return nil, newError("invalid_url", "invalid source URL", urlErr)
+	}
 	start := s.now()
 	interval, err := s.DefaultInterval(ctx)
 	if err != nil {
@@ -34,6 +40,12 @@ func (s *Service) Add(ctx context.Context, in AddInput) (*AddResult, *Error) {
 	}
 	if interval < time.Minute {
 		return nil, newError("invalid_argument", "interval must be at least 1m", nil)
+	}
+
+	if existing, found, findErr := s.findExistingAdd(ctx, in.URL, parsedURL); findErr != nil {
+		return nil, findErr
+	} else if found {
+		return existing, nil
 	}
 
 	snapshot, fetchErr := s.sources.Fetch(ctx, strings.TrimSpace(in.URL))
@@ -287,4 +299,50 @@ func baselineRelease(r source.Release, publicationID string, now time.Time) doma
 		FirstSeenAt:     now,
 		LastSeenAt:      now,
 	}
+}
+
+func (s *Service) findExistingAdd(ctx context.Context, rawURL string, u *url.URL) (*AddResult, bool, *Error) {
+	u.Fragment = ""
+	canonical := u.String()
+	if _, naroCanonical, ok := source.ParseNaroURL(rawURL); ok {
+		canonical = naroCanonical
+	}
+	q := s.store.Queries()
+	pub, err := q.GetPublicationByURL(ctx, canonical)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, mapError(err)
+	}
+	watch, err := q.GetWatchByPublication(ctx, pub.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, mapError(err)
+	}
+	b, err := s.loadBundle(ctx, q, watch.ID)
+	if err != nil {
+		return nil, false, mapError(err)
+	}
+	baseline := int64(0)
+	if b.watch.BaselineCount != nil {
+		baseline = *b.watch.BaselineCount
+	} else if b.publication.ReleaseCount != nil {
+		baseline = *b.publication.ReleaseCount
+	}
+	fields := b.source.FieldsAvailable
+	if fields == nil {
+		fields = []string{}
+	}
+	return &AddResult{
+		WatchView:             s.watchView(b),
+		Created:               false,
+		Reason:                "already_exists",
+		BaselineReleases:      baseline,
+		FieldsAvailable:       fields,
+		Warnings:              []string{},
+		ExternalWorkReference: externalWorkReference(b.source),
+	}, true, nil
 }

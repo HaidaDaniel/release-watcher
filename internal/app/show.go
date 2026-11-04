@@ -17,7 +17,7 @@ func (s *Service) Show(ctx context.Context, watchID string) (*ShowResult, *Error
 	if err != nil {
 		return nil, mapError(err)
 	}
-	events, err := q.ListEvents(ctx, store.EventFilter{WatchID: watchID, Limit: 20})
+	events, err := q.ListEvents(ctx, store.EventFilter{WatchID: watchID, Limit: 20, Descending: true})
 	if err != nil {
 		return nil, mapError(err)
 	}

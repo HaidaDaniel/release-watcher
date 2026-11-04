@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"time"
+
+	"github.com/HaidaDaniel/release-watcher/internal/store"
 )
 
 func (s *Service) Pause(ctx context.Context, watchID string) (*WatchView, *Error) {
@@ -32,30 +34,27 @@ func (s *Service) Pause(ctx context.Context, watchID string) (*WatchView, *Error
 }
 
 func (s *Service) Resume(ctx context.Context, watchID string) (*WatchView, *Error) {
-	q := s.store.Queries()
-	watch, err := q.GetWatch(ctx, watchID)
-	if err != nil {
-		return nil, mapError(err)
-	}
 	now := s.now()
-	if watch.Enabled && watch.PausedAt == nil {
-		b, loadErr := s.loadBundle(ctx, q, watchID)
-		if loadErr != nil {
-			return nil, mapError(loadErr)
+	txErr := s.store.InTx(ctx, func(q *store.Queries) error {
+		watch, err := q.GetWatch(ctx, watchID)
+		if err != nil {
+			return err
 		}
-		view := s.watchView(b)
-		return &view, nil
+		if watch.Enabled && watch.PausedAt == nil {
+			return nil
+		}
+		if err := q.UpdateWatchSchedule(ctx, watchID, watch.IntervalSeconds, now, now); err != nil {
+			return err
+		}
+		if err := q.UpdatePublicationNextCheck(ctx, watch.PublicationID, now, now); err != nil {
+			return err
+		}
+		return q.SetWatchEnabled(ctx, watchID, true, nil, now)
+	})
+	if txErr != nil {
+		return nil, mapError(txErr)
 	}
-	if err := q.UpdateWatchSchedule(ctx, watchID, watch.IntervalSeconds, now, now); err != nil {
-		return nil, mapError(err)
-	}
-	if err := q.UpdatePublicationNextCheck(ctx, watch.PublicationID, now, now); err != nil {
-		return nil, mapError(err)
-	}
-	if err := q.SetWatchEnabled(ctx, watchID, true, nil, now); err != nil {
-		return nil, mapError(err)
-	}
-	b, loadErr := s.loadBundle(ctx, q, watchID)
+	b, loadErr := s.loadBundle(ctx, s.store.Queries(), watchID)
 	if loadErr != nil {
 		return nil, mapError(loadErr)
 	}
@@ -67,20 +66,22 @@ func (s *Service) SetInterval(ctx context.Context, watchID string, interval time
 	if interval < time.Minute {
 		return nil, newError("invalid_argument", "interval must be at least 1m", nil)
 	}
-	q := s.store.Queries()
-	watch, err := q.GetWatch(ctx, watchID)
-	if err != nil {
-		return nil, mapError(err)
-	}
 	now := s.now()
 	nextCheck := now.Add(interval)
-	if err := q.UpdateWatchSchedule(ctx, watchID, int64(interval/time.Second), nextCheck, now); err != nil {
-		return nil, mapError(err)
+	txErr := s.store.InTx(ctx, func(q *store.Queries) error {
+		watch, err := q.GetWatch(ctx, watchID)
+		if err != nil {
+			return err
+		}
+		if err := q.UpdateWatchSchedule(ctx, watchID, int64(interval/time.Second), nextCheck, now); err != nil {
+			return err
+		}
+		return q.UpdatePublicationNextCheck(ctx, watch.PublicationID, nextCheck, now)
+	})
+	if txErr != nil {
+		return nil, mapError(txErr)
 	}
-	if err := q.UpdatePublicationNextCheck(ctx, watch.PublicationID, nextCheck, now); err != nil {
-		return nil, mapError(err)
-	}
-	b, loadErr := s.loadBundle(ctx, q, watchID)
+	b, loadErr := s.loadBundle(ctx, s.store.Queries(), watchID)
 	if loadErr != nil {
 		return nil, mapError(loadErr)
 	}

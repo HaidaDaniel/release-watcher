@@ -95,3 +95,10 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Status: Accepted and implemented by task 0005
 - Decision: Every read and mutation command returns either a localized human rendering or one JSON envelope (`schema_version`, `ok`, `data`/`error`). Machine codes and field names are English. Exit codes are 0 success, 1 runtime failure, 2 usage/input, 3 partial scan, 4 scan lock held. `add` is idempotent for the same source line and returns the existing watch with `created: false`; the first add stores a baseline and emits no release events. `scan --due` uses persisted `next_check_at`, `--all` scans all enabled watches, and `--id` forces one watch. A process file lock prevents overlapping scans. Each watch has its own timeout; one failure is recorded and does not stop the others.
 - Consequences: Agents can drive the same use cases as humans without a server. Events remain the durable source for future MCP and Media Core. A partial scan is visible in both the JSON result and exit code 3, so a timer can alarm without hiding successful watches.
+
+## ADR-0014 — Idempotent add is local; event dedupe is state-plus-time
+
+- Date: 2026-11-04
+- Status: Accepted and implemented by corrective review of task 0005
+- Decision: A repeated `add` resolves the existing publication/watch from local state before any network fetch, so it remains idempotent when the source is down. It returns `created: false` and `reason: already_exists`. Scan changes and events are committed atomically; a replay with no new state emits nothing. The event dedupe key preserves transition order (for example `ongoing → completed` differs from `completed → ongoing`) and includes the detection time, so a later legitimate recurrence is not suppressed. Release-set parts are sorted for stability.
+- Consequences: "Dedupe" does not mean an event can never recur; it means the same committed transition is not inserted twice. Consumers deduplicate by the stable `event_id`. `show` reads the newest events while the `events` command stays ascending for cursor paging.

@@ -99,6 +99,21 @@ func (q *Queries) GetPublicationBySourceURL(ctx context.Context, sourceID, origi
 	return q.GetPublication(ctx, id)
 }
 
+func (q *Queries) GetPublicationByURL(ctx context.Context, originalURL string) (*domain.Publication, error) {
+	var id string
+	err := q.q.QueryRowContext(ctx,
+		`SELECT id FROM publication WHERE original_url = ? ORDER BY created_at ASC LIMIT 1`,
+		originalURL,
+	).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: find publication by url: %w", err)
+	}
+	return q.GetPublication(ctx, id)
+}
+
 func (q *Queries) ListPublications(ctx context.Context) ([]domain.Publication, error) {
 	rows, err := q.q.QueryContext(ctx,
 		`SELECT `+publicationColumns+` FROM publication ORDER BY created_at ASC, id ASC`)

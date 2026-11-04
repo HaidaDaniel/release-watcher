@@ -69,6 +69,7 @@ type EventFilter struct {
 	Since         *time.Time
 	After         string
 	Limit         int
+	Descending    bool
 }
 
 func (q *Queries) ListEvents(ctx context.Context, filter EventFilter) ([]domain.Event, error) {
@@ -101,7 +102,11 @@ func (q *Queries) ListEvents(ctx context.Context, filter EventFilter) ([]domain.
 		query += ` AND (detected_at > ? OR (detected_at = ? AND id > ?))`
 		args = append(args, cursorTime, cursorTime, filter.After)
 	}
-	query += ` ORDER BY detected_at ASC, id ASC LIMIT ?`
+	if filter.Descending {
+		query += ` ORDER BY detected_at DESC, id DESC LIMIT ?`
+	} else {
+		query += ` ORDER BY detected_at ASC, id ASC LIMIT ?`
+	}
 	args = append(args, filter.Limit)
 
 	rows, err := q.q.QueryContext(ctx, query, args...)

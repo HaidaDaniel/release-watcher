@@ -150,14 +150,27 @@ func TestMetadataAndStatusChanges(t *testing.T) {
 	}
 }
 
-func TestDedupeKeyIsStable(t *testing.T) {
+func TestDedupeKeyKeepsTransitionOrder(t *testing.T) {
 	a := scan.DedupeKey("w", domain.EventReleaseAdded, "b", "a")
-	b := scan.DedupeKey("w", domain.EventReleaseAdded, "a", "b")
+	b := scan.DedupeKey("w", domain.EventReleaseAdded, "b", "a")
 	if a != b {
-		t.Fatalf("dedupe keys differ: %s / %s", a, b)
+		t.Fatal("same parts produced different keys")
 	}
-	if a == scan.DedupeKey("w", domain.EventReleaseUpdated, "a", "b") {
+	if a == scan.DedupeKey("w", domain.EventReleaseAdded, "a", "b") {
+		t.Fatal("part order must be preserved for transition semantics")
+	}
+	if a == scan.DedupeKey("w", domain.EventReleaseUpdated, "b", "a") {
 		t.Fatal("event type does not affect dedupe key")
+	}
+}
+
+func TestReleasePartsAreSorted(t *testing.T) {
+	parts := scan.ReleaseParts([]domain.Release{
+		{ExternalID: "b", ContentHash: "2"},
+		{ExternalID: "a", ContentHash: "1"},
+	})
+	if len(parts) != 2 || parts[0] != "a|1" || parts[1] != "b|2" {
+		t.Fatalf("parts = %#v", parts)
 	}
 }
 
@@ -170,5 +183,49 @@ func TestRetryDelayBounded(t *testing.T) {
 	}
 	if got := scan.RetryDelay(2*time.Hour, 5); got != 2*time.Hour {
 		t.Fatalf("delay = %v", got)
+	}
+}
+
+func TestCountOnlyReconcileWithPreviouslyRemovedRelease(t *testing.T) {
+	pub, watch, work := baseInputs()
+	watch.Mode = domain.ModeCountOnly
+	pub.ReleaseCount = int64Ptr(2)
+	removedAt := time.Now().UTC()
+	existing := []domain.Release{release("1", "h1")}
+	existing[0].RemovedAt = &removedAt
+	change, err := scan.Compare(pub, watch, work, snapshot(domain.ModeCatalog, true, srcRelease("1", "h1"), srcRelease("2", "h2")), existing, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !change.Reconcile || change.CountChanged || len(change.Added) != 2 {
+		t.Fatalf("change = %+v", change)
+	}
+	if change.Added[0].ID != "rel-1" {
+		t.Fatalf("existing release id not preserved: %+v", change.Added[0])
+	}
+}
+
+func TestDuplicateSnapshotEntriesAreCollapsed(t *testing.T) {
+	pub, watch, work := baseInputs()
+	watch.BaselineEstablishedAt = nil
+	change, err := scan.Compare(pub, watch, work, snapshot(domain.ModeCatalog, true, srcRelease("1", "h1"), srcRelease("1", "h1")), nil, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(change.Added) != 1 {
+		t.Fatalf("added = %d", len(change.Added))
+	}
+}
+
+func TestIncompleteCatalogKeepsCountOnly(t *testing.T) {
+	pub, watch, work := baseInputs()
+	watch.Mode = domain.ModeCountOnly
+	pub.ReleaseCount = int64Ptr(3)
+	change, err := scan.Compare(pub, watch, work, snapshot(domain.ModeCatalog, false, srcRelease("1", "h1")), nil, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if change.Reconcile || change.CountChanged || len(change.Added) != 0 || change.Mode != domain.ModeCountOnly {
+		t.Fatalf("change = %+v", change)
 	}
 }

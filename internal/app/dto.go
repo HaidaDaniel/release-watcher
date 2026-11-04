@@ -19,6 +19,7 @@ type WatchView struct {
 	Status            string     `json:"status"`
 	StatusKnown       bool       `json:"status_known"`
 	StatusSource      string     `json:"status_source"`
+	LastPublishedAt   *time.Time `json:"last_published_at"`
 	Enabled           bool       `json:"enabled"`
 	IntervalSeconds   int64      `json:"interval_seconds"`
 	LastCheckedAt     *time.Time `json:"last_checked_at"`
