@@ -47,7 +47,7 @@ Exit: a failed Telegram request is retried and a successful event produces exact
 
 Exit: backup/restore, doctor, local binary smoke and static systemd verification are done. A live-schema acceptance run on a host, the polite Narō smoke and the first Whoosh deployment remain separate tasks and are not claimed.
 
-## Stage 5 — Media Core documentation (separate repository)
+## Stage 5 — Media Core documentation (separate repository) — done
 
 - README, AGENTS, project/scope/architecture/domain-model/roadmap/integration-contract.
 - ContentReference/ContentAsset/ContentProvider/DeliveryTarget concept only; no business logic.

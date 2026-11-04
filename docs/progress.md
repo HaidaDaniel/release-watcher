@@ -40,6 +40,8 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - No live Narō smoke test has been run; adapter tests use local fixtures and test servers.
 - Notification tests: grouped RU/EN messages and grammar, dedupe, failure then retry, 429 retry_after, non-JSON 5xx/429 retries, permanent 403/400 not retried, max-attempt exhaustion, invalid responses, failed-delivery restart persistence, no configured Telegram, token not leaked in errors/stored last_error, `scan --no-notify` pending counts, `notify` JSON and automatic delivery: see task 0006 evidence.
 - Application/scan/CLI tests: first add baseline without events, duplicate add (including offline), one/many new chapters, replay without duplicates, failure/recovery, empty and sliding RSS windows, count-only reconciliation (including previously removed releases), repeated status transitions, due/global intervals, pause/resume/remove, restart, recent-event history and pagination, metadata/status payloads, invalid/unknown URLs, concurrent scan lock, partial scan isolation and JSON CLI flows: see task 0005 evidence.
+- Installation tests: backup/restore round-trip, force/exclusivity, bad/missing manifest hash or size, newer/empty schema, sidecar cleanup, symlink/hardlink backup-target rejection, database/archive permissions, doctor schema/newer-schema/read-only sidecar behavior, systemd verification, install rendering with XDG/special paths: see task 0007 evidence.
+- Linux amd64/arm64 builds and local binary smoke checks are recorded in docs/deployment.md.
 
 ## Deployed
 
@@ -52,4 +54,4 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Next step
 
-MVP acceptance on a real host, a polite live Narō smoke test, the Whoosh deployment spike, and Media Core documentation remain. See docs/roadmap.md and tasks 0008–0009.
+Remaining backlog: Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), a polite live Narō smoke test, MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.

@@ -10,6 +10,7 @@ Status: MVP vertical slice plus notifications and local installation. Add a sour
 go build -o bin/release-watcher ./cmd/release-watcher
 # or cross-compile:
 scripts/build.sh --all
+scripts/install.sh --enable   # user binary + systemd timer
 ```
 
 `version` reports honest build identity. A plain `go build` reports `0.1.0-dev` / `unknown` / `development`.

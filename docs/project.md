@@ -51,7 +51,7 @@ release-watcher scan --due
 | Backup/restore and atomic restore validation | implemented |
 | systemd units and user install script | implemented (static/local proof) |
 | Whoosh Core deployment spike | assessed, not executed |
-| Media Core documentation | separate repository |
+| Media Core documentation | done in separate repository (docs only) |
 
 ## Boundary
 
