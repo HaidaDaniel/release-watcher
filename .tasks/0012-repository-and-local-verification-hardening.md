@@ -1,6 +1,6 @@
 # Task 0012 - Repository and local verification hardening
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
