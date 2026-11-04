@@ -1,6 +1,6 @@
 # Task 0006 - Notifications: durable Telegram outbox with retries and RU/EN messages
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
