@@ -20,9 +20,6 @@ type Error struct {
 	Retryable  bool
 	RetryAfter time.Duration
 	StatusCode int
-	Cause      error
 }
 
 func (e *Error) Error() string { return e.Code + ": " + e.Message }
-
-func (e *Error) Unwrap() error { return e.Cause }

@@ -351,14 +351,17 @@ func TestTelegramMaxAttemptsBounded(t *testing.T) {
 	if _, appErr := env.svc.Notify(ctx); appErr != nil {
 		t.Fatal(appErr)
 	}
-	_, afterMax := tg.snapshot()
+	_, afterMaxRequests := tg.snapshot()
+	if afterMaxRequests != 3 {
+		t.Fatalf("attempts = %d, want 3", afterMaxRequests)
+	}
 	clock = clock.Add(365 * 24 * time.Hour)
 	if _, appErr := env.svc.Notify(ctx); appErr != nil {
 		t.Fatal(appErr)
 	}
-	_, afterYear := tg.snapshot()
-	if afterYear != afterMax {
-		t.Fatalf("retried after max attempts: %d -> %d", afterMax, afterYear)
+	_, afterYearRequests := tg.snapshot()
+	if afterYearRequests != afterMaxRequests {
+		t.Fatalf("retried after max attempts: %d -> %d", afterMaxRequests, afterYearRequests)
 	}
 }
 

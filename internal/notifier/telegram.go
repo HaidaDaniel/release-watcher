@@ -53,17 +53,17 @@ func (t *Telegram) Send(ctx context.Context, text string) error {
 	endpoint := t.APIBase + "/bot" + t.Token + "/sendMessage"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		return &Error{Code: CodeTelegramBadRequest, Message: "cannot build Telegram request", Cause: err}
+		return &Error{Code: CodeTelegramBadRequest, Message: "cannot build Telegram request"}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.Client.Do(req)
 	if err != nil {
-		return &Error{Code: CodeTelegramUnreachable, Message: "Telegram request failed", Retryable: true, Cause: err}
+		return &Error{Code: CodeTelegramUnreachable, Message: "Telegram request failed", Retryable: true}
 	}
 	defer resp.Body.Close()
 	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	if readErr != nil {
-		return &Error{Code: CodeTelegramUnreachable, Message: "cannot read Telegram response", Retryable: true, Cause: readErr}
+		return &Error{Code: CodeTelegramUnreachable, Message: "cannot read Telegram response", Retryable: true}
 	}
 	var payload struct {
 		OK          bool   `json:"ok"`
