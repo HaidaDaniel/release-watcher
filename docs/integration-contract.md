@@ -1,6 +1,6 @@
 # Integration contract
 
-Status: version 1.0 contract. The CLI JSON envelope and event schema are the stable interfaces for agents and Media Core. Implementation lands in tasks 0005–0007; this document is the target and must be updated if the implementation intentionally changes a field.
+Status: version 1.0 contract, implemented. The CLI JSON envelope and event schema are the stable interfaces for agents and Media Core. This document must be updated if the implementation intentionally changes a field.
 
 ## Contract versions
 

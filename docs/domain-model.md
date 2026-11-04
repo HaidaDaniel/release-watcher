@@ -1,6 +1,6 @@
 # Domain model
 
-Status: accepted and implemented by migration 0001 and `internal/store`. Adapters and scan logic are not implemented yet.
+Status: implemented by migrations 0001–0002 and `internal/store`, with source adapters and scan logic implemented and tested.
 
 ## Entity overview
 

@@ -4,7 +4,6 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Planned
 
-- Media Core documentation in its own repository.
 - Whoosh Core deployment spike and first controlled deployment after MVP.
 - Backlog sources and MCP stdio.
 
@@ -32,6 +31,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Linux amd64 and arm64 builds; static systemd verification and local binary smoke checks.
 - Narō `end` mapping corrected to the official specification; unwatch preserves history and `purge` is explicit; daily persistent timer and doctor cadence check; non-leaking secret scanner and mandatory APK lint.
 - Live Narō smoke and isolated E2E regression are implemented and pass.
+- Media Core documentation is complete in its separate repository (docs only).
 
 ## Tested
 
@@ -52,8 +52,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Deployed
 
-- Functional MVP: verified locally, including the live Narō smoke and isolated E2E.
-- Deployed MVP: not deployed. Linux binaries were built locally, the amd64 binary was smoke-checked, and systemd units were statically verified. No real Linux host was provided for installation, reboot/linger verification, or the Whoosh spike.
+- Deployed MVP: not deployed. The functional MVP is verified locally (see Tested), but Linux binaries were only built and smoke-checked locally and systemd units were statically verified. No real Linux host was provided for installation, reboot/linger verification, or the Whoosh spike.
 
 ## Blocked
 
