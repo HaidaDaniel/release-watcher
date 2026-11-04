@@ -166,6 +166,10 @@ func TestDoctorScheduleCadenceParsing(t *testing.T) {
 		{name: "weekday range is conservative", unit: "OnCalendar=Mon..Fri *-*-* 04:15:00", want: "warn", message: "cannot determine"},
 		{name: "weekday with step is conservative", unit: "OnCalendar=Mon *-*-* 00/6:00:00", want: "warn", message: "cannot determine"},
 		{name: "monthly date is conservative", unit: "OnCalendar=*-*-01 04:15:00", want: "warn", message: "cannot determine"},
+		{name: "offset hour step uses max gap", unit: "OnCalendar=*-*-* 04/10:00:00", want: "warn", message: "14h"},
+		{name: "offset minute step uses max gap", unit: "OnCalendar=*-*-* *:10/25:00", want: "ok", message: "35m"},
+		{name: "clock only", unit: "OnCalendar=04:15", want: "warn", message: "24h"},
+		{name: "clock only seconds", unit: "OnCalendar=04:15:00", want: "warn", message: "24h"},
 		{name: "drop-in six hour", unit: "OnCalendar=*-*-* 04:15:00", dropIn: "OnCalendar=*-*-* 00/6:00:00", want: "ok", message: "6h"},
 	}
 	for _, tc := range cases {

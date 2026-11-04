@@ -492,7 +492,21 @@ func systemdUserUnitDirs(getenv func(string) string) []string {
 			dirs = append(dirs, filepath.Join(dir, "systemd", "user"))
 		}
 	}
-	dirs = append(dirs, "/etc/systemd/user", "/usr/lib/systemd/user")
+	if dataHome := strings.TrimSpace(getenv("XDG_DATA_HOME")); dataHome != "" {
+		dirs = append(dirs, filepath.Join(dataHome, "systemd", "user"))
+	}
+	if runtimeDir := strings.TrimSpace(getenv("XDG_RUNTIME_DIR")); runtimeDir != "" {
+		dirs = append(dirs, filepath.Join(runtimeDir, "systemd", "user"))
+	}
+	dirs = append(dirs,
+		"/etc/xdg/systemd/user",
+		"/usr/local/lib/systemd/user",
+		"/usr/local/share/systemd/user",
+		"/usr/share/systemd/user",
+		"/etc/systemd/user",
+		"/run/systemd/user",
+		"/usr/lib/systemd/user",
+	)
 	seen := map[string]bool{}
 	out := make([]string, 0, len(dirs))
 	for _, dir := range dirs {
@@ -562,6 +576,9 @@ func calendarCadence(value string) (time.Duration, bool) {
 		weekly = true
 		fields = fields[1:]
 	}
+	if len(fields) == 1 && strings.Contains(fields[0], ":") {
+		fields = []string{"*-*-*", fields[0]}
+	}
 	if len(fields) < 2 || fields[0] != "*-*-*" {
 		return 0, false
 	}
@@ -577,17 +594,45 @@ func calendarCadence(value string) (time.Duration, bool) {
 		return 0, false
 	}
 	hour, minute := parts[0], parts[1]
-	if idx := strings.IndexByte(hour, '/'); idx >= 0 {
-		if n, err := strconv.Atoi(hour[idx+1:]); err == nil && n > 0 {
-			return time.Duration(n) * time.Hour, true
+	if strings.Contains(hour, "/") {
+		if strings.Contains(minute, "/") {
+			return 0, false
 		}
-		return 0, false
+		start, step, ok := parseStep(hour)
+		if !ok || start < 0 || start >= 24 {
+			return 0, false
+		}
+		gap := maxStepGap(start, step, 24)
+		if gap <= 0 {
+			return 0, false
+		}
+		return time.Duration(gap) * time.Hour, true
 	}
-	if idx := strings.IndexByte(minute, '/'); idx >= 0 {
-		if n, err := strconv.Atoi(minute[idx+1:]); err == nil && n > 0 {
-			return time.Duration(n) * time.Minute, true
+	if strings.Contains(minute, "/") {
+		start, step, ok := parseStep(minute)
+		if !ok || start < 0 || start >= 60 {
+			return 0, false
 		}
-		return 0, false
+		if hour == "*" {
+			gap := maxStepGap(start, step, 60)
+			if gap <= 0 {
+				return 0, false
+			}
+			return time.Duration(gap) * time.Minute, true
+		}
+		if _, err := strconv.Atoi(hour); err != nil {
+			return 0, false
+		}
+		last := start
+		for next := start + step; next < 60; next += step {
+			last = next
+		}
+		covered := last - start
+		gapMinutes := 24*60 - covered
+		if gapMinutes <= 0 {
+			return 0, false
+		}
+		return time.Duration(gapMinutes) * time.Minute, true
 	}
 	if hour == "*" {
 		return time.Hour, true
@@ -598,6 +643,41 @@ func calendarCadence(value string) (time.Duration, bool) {
 		}
 	}
 	return 0, false
+}
+
+func parseStep(value string) (start, step int, ok bool) {
+	idx := strings.IndexByte(value, '/')
+	if idx < 0 {
+		return 0, 0, false
+	}
+	start, err := strconv.Atoi(value[:idx])
+	if err != nil || start < 0 {
+		return 0, 0, false
+	}
+	step, err = strconv.Atoi(value[idx+1:])
+	if err != nil || step <= 0 {
+		return 0, 0, false
+	}
+	return start, step, true
+}
+
+// maxStepGap returns the longest gap between runs for a step schedule within
+// one cycle, including the wrap-around gap. For start=4, step=10, cycle=24 the
+// runs are 04:00 and 14:00, so the longest gap is 14h, not 10h.
+func maxStepGap(start, step, cycle int) int {
+	if step <= 0 || start < 0 || start >= cycle {
+		return 0
+	}
+	last := start
+	for next := start + step; next < cycle; next += step {
+		last = next
+	}
+	covered := last - start
+	wrap := cycle - covered
+	if wrap < step {
+		return step
+	}
+	return wrap
 }
 
 func isWeekdayExpression(value string) bool {
