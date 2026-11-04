@@ -62,7 +62,7 @@ Exit: backup/restore, doctor, local binary smoke, static systemd verification an
 - Polite live Narō smoke, isolated E2E with Telegram outbox/retry and two-watch isolation.
 - Full acceptance matrix: tests, race, vet, builds, backup/restore, doctor, systemd, JSON purity, lock/signal/timeout.
 
-Exit: functional MVP passes locally. Deployed MVP remains blocked until a real Linux host is provided and the Whoosh spike is executed.
+Exit: functional MVP passes locally. Deployed MVP remains blocked until a real Linux host is provided; the Whoosh spike is a separate optional deployment evaluation after that.
 
 ## Deferred backlog
 

@@ -52,7 +52,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Deployed
 
-- Deployed MVP: not deployed. The functional MVP is verified locally (see Tested), but Linux binaries were only built and smoke-checked locally and systemd units were statically verified. No real Linux host was provided for installation, reboot/linger verification, or the Whoosh spike.
+- Deployed MVP: not deployed. The functional MVP is verified locally (see Tested), but Linux binaries were built locally; the amd64 binary was smoke-checked and ARM64 was not executed; systemd units were statically verified. No real Linux host was provided for installation, reboot/linger verification, or the Whoosh spike.
 
 ## Blocked
 
