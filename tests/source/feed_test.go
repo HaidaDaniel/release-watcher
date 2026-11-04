@@ -107,3 +107,42 @@ func TestRegistryFetchByKindRSS(t *testing.T) {
 		t.Fatalf("snapshot = %+v", got)
 	}
 }
+
+func TestRSS1RDFFeed(t *testing.T) {
+	payload := fixture(t, "rss1.xml")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		_, _ = w.Write(payload)
+	}))
+	defer server.Close()
+
+	adapter := source.NewFeed(testClient())
+	got, err := adapter.Fetch(context.Background(), server.URL+"/rdf.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SourceKind != domain.SourceRSS {
+		t.Fatalf("kind = %q", got.SourceKind)
+	}
+	if got.Count != 2 || len(got.Releases) != 2 {
+		t.Fatalf("count=%d releases=%d", got.Count, len(got.Releases))
+	}
+	if got.Releases[0].PublishedAt == nil {
+		t.Fatal("dc:date not parsed")
+	}
+	if got.Releases[1].URL == nil || *got.Releases[1].URL != server.URL+"/rdf/2" {
+		t.Fatalf("relative link = %v", got.Releases[1].URL)
+	}
+}
+
+func TestRegistryRejectsKindMismatch(t *testing.T) {
+	reg := source.NewRegistry(testClient())
+	_, err := reg.FetchByKind(context.Background(), domain.SourceNaro, "https://example.test/feed.xml")
+	if err == nil {
+		t.Fatal("naro kind accepted a non-Naro URL")
+	}
+	srcErr, ok := err.(*source.Error)
+	if !ok || srcErr.Code != source.CodeUnsupportedSource {
+		t.Fatalf("err = %#v", err)
+	}
+}

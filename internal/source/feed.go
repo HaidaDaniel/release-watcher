@@ -2,9 +2,11 @@ package source
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/xml"
-	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -27,6 +29,7 @@ type feedRoot struct {
 	XMLName xml.Name
 	Channel *rssChannel `xml:"channel"`
 	Title   string      `xml:"title"`
+	Items   []rssItem   `xml:"item"`
 	Entries []atomEntry `xml:"entry"`
 }
 
@@ -92,7 +95,8 @@ func (a *FeedAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 	case root.Channel != nil:
 		snapshot.SourceKind = domain.SourceRSS
 		snapshot.Metadata.OriginalTitle = strings.TrimSpace(root.Channel.Title)
-		for _, item := range root.Channel.Items {
+		items := append(append([]rssItem{}, root.Channel.Items...), root.Items...)
+		for _, item := range items {
 			releases = append(releases, rssRelease(item))
 		}
 	case root.XMLName.Local == "feed" || len(root.Entries) > 0:
@@ -105,6 +109,7 @@ func (a *FeedAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 		return nil, &Error{Code: CodeUnsupportedSource, Message: "URL is not an RSS or Atom feed"}
 	}
 	for i := range releases {
+		releases[i].URL = resolveFeedURL(u, releases[i].URL)
 		releases[i].ContentHash = HashRelease(releases[i])
 	}
 	snapshot.Releases = releases
@@ -167,9 +172,6 @@ func alternateLink(links []atomLink) string {
 			return link.Href
 		}
 	}
-	if len(links) > 0 {
-		return links[0].Href
-	}
 	return ""
 }
 
@@ -187,7 +189,24 @@ func fallbackEntryID(title string, published *time.Time) string {
 	if published != nil {
 		base += "|" + published.UTC().Format(time.RFC3339)
 	}
-	return "entry:" + fmt.Sprintf("%x", []byte(base))
+	sum := sha256.Sum256([]byte(base))
+	return "entry:" + hex.EncodeToString(sum[:])
+}
+
+func resolveFeedURL(base *url.URL, raw *string) *string {
+	if raw == nil || strings.TrimSpace(*raw) == "" {
+		return nil
+	}
+	ref, err := url.Parse(strings.TrimSpace(*raw))
+	if err != nil {
+		return nil
+	}
+	resolved := base.ResolveReference(ref)
+	if resolved.Scheme != "http" && resolved.Scheme != "https" {
+		return nil
+	}
+	value := resolved.String()
+	return &value
 }
 
 func parseFeedTime(value string) *time.Time {

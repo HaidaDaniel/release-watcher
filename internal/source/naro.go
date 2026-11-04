@@ -98,16 +98,18 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 	if err != nil {
 		return nil, mapHTTPError(err)
 	}
-	meta, allCount, err := parseNaroAPI(resp.Body)
+	meta, err := parseNaroAPI(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	if meta == nil {
 		return nil, &Error{Code: CodeNotFound, Message: "Narō returned no metadata for this ncode"}
 	}
-	chapterCount := allCount
+	chapterCount := 0
+	knownCount := false
 	if meta.GeneralAllNo != nil {
 		chapterCount = *meta.GeneralAllNo
+		knownCount = true
 	}
 
 	snapshot := &Snapshot{
@@ -137,28 +139,29 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 		snapshot.Metadata.ExternalUpdatedAt = parsed
 	}
 
-	pages := naroPageCount(chapterCount)
-	complete := true
 	var warnings []string
 	seen := map[string]bool{}
 	var releases []Release
-	for page := 1; page <= pages; page++ {
+	exhausted := false
+	page := 1
+	for page <= naroMaxPages {
 		pageURL := fmt.Sprintf("%s%s/?p=%d", strings.TrimRight(a.CatalogBase, "/")+"/", strings.ToLower(ncode), page)
 		pageResp, err := a.Client.Get(ctx, pageURL)
 		if err != nil {
-			complete = false
 			warnings = append(warnings, fmt.Sprintf("catalog page %d unavailable: %s", page, mapHTTPError(err).Message))
 			break
 		}
 		pageReleases, parseErr := parseNaroCatalog(pageResp.Body, ncode)
 		if parseErr != nil {
-			complete = false
 			warnings = append(warnings, fmt.Sprintf("catalog page %d could not be parsed: %v", page, parseErr))
 			break
 		}
-		if len(pageReleases) == 0 && chapterCount > 0 {
-			complete = false
-			warnings = append(warnings, fmt.Sprintf("catalog page %d contained no chapters", page))
+		if len(pageReleases) == 0 {
+			exhausted = true
+			if page == 1 && knownCount && chapterCount > 0 {
+				exhausted = false
+				warnings = append(warnings, "catalog page 1 contained no chapters")
+			}
 			break
 		}
 		base := strings.TrimRight(a.CatalogBase, "/") + "/" + strings.ToLower(ncode) + "/"
@@ -174,15 +177,18 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 			r.ContentHash = HashRelease(r)
 			releases = append(releases, r)
 		}
-		if len(releases) >= chapterCount && chapterCount > 0 {
+		if len(pageReleases) < naroPageSize {
+			exhausted = true
 			break
 		}
+		page++
 	}
-	if chapterCount > 0 && int64(len(releases)) < int64(chapterCount) {
+	if page > naroMaxPages {
+		warnings = append(warnings, "catalog page limit reached; completeness is unknown")
+	}
+	complete := exhausted
+	if knownCount && int64(len(releases)) < int64(chapterCount) {
 		complete = false
-		if len(releases) == 0 {
-			snapshot.Mode = domain.ModeCountOnly
-		}
 	}
 	if len(releases) > 0 {
 		snapshot.Releases = releases
@@ -193,7 +199,10 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 			snapshot.Metadata.LastPublishedAt = latestReleaseTime(releases)
 		}
 	}
-	snapshot.Complete = complete && (chapterCount == 0 || int64(len(releases)) == int64(chapterCount))
+	if len(releases) == 0 && !complete {
+		snapshot.Mode = domain.ModeCountOnly
+	}
+	snapshot.Complete = complete
 	snapshot.Warnings = warnings
 
 	fields := []string{"original_url", "title"}
@@ -216,31 +225,31 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 	return snapshot, nil
 }
 
-func parseNaroAPI(body []byte) (*naroAPIMeta, int, error) {
+func parseNaroAPI(body []byte) (*naroAPIMeta, error) {
 	var entries []json.RawMessage
 	if err := json.Unmarshal(body, &entries); err != nil {
-		return nil, 0, &Error{Code: CodeFetchFailed, Message: "Narō API returned invalid JSON", Cause: err}
+		return nil, &Error{Code: CodeFetchFailed, Message: "Narō API returned invalid JSON", Cause: err}
 	}
 	if len(entries) < 2 {
-		return nil, 0, &Error{Code: CodeNotFound, Message: "Narō API returned no novel data"}
+		return nil, &Error{Code: CodeNotFound, Message: "Narō API returned no novel data"}
 	}
 	var head struct {
 		AllCount int `json:"allcount"`
 	}
 	if err := json.Unmarshal(entries[0], &head); err != nil {
-		return nil, 0, &Error{Code: CodeFetchFailed, Message: "Narō API header is invalid", Cause: err}
+		return nil, &Error{Code: CodeFetchFailed, Message: "Narō API header is invalid", Cause: err}
 	}
 	if head.AllCount == 0 {
-		return nil, 0, &Error{Code: CodeNotFound, Message: "Narō API reports no such novel"}
+		return nil, &Error{Code: CodeNotFound, Message: "Narō API reports no such novel"}
 	}
 	var meta naroAPIMeta
 	if err := json.Unmarshal(entries[1], &meta); err != nil {
-		return nil, 0, &Error{Code: CodeFetchFailed, Message: "Narō API metadata is invalid", Cause: err}
+		return nil, &Error{Code: CodeFetchFailed, Message: "Narō API metadata is invalid", Cause: err}
 	}
 	if strings.TrimSpace(meta.NCode) == "" {
-		return nil, 0, &Error{Code: CodeNotFound, Message: "Narō API returned no ncode"}
+		return nil, &Error{Code: CodeNotFound, Message: "Narō API returned no ncode"}
 	}
-	return &meta, head.AllCount, nil
+	return &meta, nil
 }
 
 func parseNaroAPIUpTime(value string) *time.Time {
@@ -290,6 +299,10 @@ func parseNaroCatalog(body []byte, ncode string) ([]Release, error) {
 					if number == "" {
 						continue
 					}
+					if current != nil {
+						out = append(out, *current)
+						current = nil
+					}
 					inTitle = true
 					title = ""
 					n := number
@@ -338,6 +351,9 @@ func parseNaroCatalog(body []byte, ncode string) ([]Release, error) {
 			}
 		}
 	}
+	if current != nil {
+		out = append(out, *current)
+	}
 	return out, nil
 }
 
@@ -375,17 +391,6 @@ func parseNaroCatalogTime(value string) *time.Time {
 	}
 	utc := t.UTC()
 	return &utc
-}
-
-func naroPageCount(allCount int) int {
-	if allCount <= 0 {
-		return 1
-	}
-	pages := (allCount + naroPageSize - 1) / naroPageSize
-	if pages > naroMaxPages {
-		return naroMaxPages
-	}
-	return pages
 }
 
 func latestReleaseTime(releases []Release) *time.Time {

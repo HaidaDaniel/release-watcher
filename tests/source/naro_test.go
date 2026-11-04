@@ -197,3 +197,87 @@ func TestNaroInvalidURL(t *testing.T) {
 		t.Fatal("accepted a non-Naro URL")
 	}
 }
+
+func TestNaroChapterWithoutUpdateBlockIsKept(t *testing.T) {
+	api := fixture(t, "naro_api.json")
+	htmlBody := `<div class="p-eplist">
+<div class="p-eplist__sublist"><a href="/n2166fe/1/" class="p-eplist__subtitle">One</a><div class="p-eplist__update">2023/08/01 22:25</div></div>
+<div class="p-eplist__sublist"><a href="/n2166fe/2/" class="p-eplist__subtitle">Two</a></div>
+<div class="p-eplist__sublist"><a href="/n2166fe/3/" class="p-eplist__subtitle">Three</a><div class="p-eplist__update">2023/08/01 22:26</div></div>
+</div>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/novelapi/api/" {
+			_, _ = w.Write(api)
+			return
+		}
+		_, _ = w.Write([]byte(htmlBody))
+	}))
+	defer server.Close()
+
+	adapter := source.NewNaro(testClient())
+	adapter.APIBase = server.URL + "/novelapi/api/"
+	adapter.CatalogBase = server.URL + "/"
+	got, err := adapter.Fetch(context.Background(), "https://ncode.syosetu.com/n2166fe/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Releases) != 3 || !got.Complete {
+		t.Fatalf("releases=%d complete=%v", len(got.Releases), got.Complete)
+	}
+	if got.Releases[1].ExternalID != "N2166FE/2" || got.Releases[1].PublishedAt != nil {
+		t.Fatalf("middle release = %+v", got.Releases[1])
+	}
+}
+
+func TestNaroCatalogExhaustionDetectsUndercount(t *testing.T) {
+	api := strings.Replace(string(fixture(t, "naro_api.json")), `"general_all_no":3`, `"general_all_no":100`, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/novelapi/api/" {
+			_, _ = w.Write([]byte(api))
+			return
+		}
+		switch r.URL.Query().Get("p") {
+		case "1":
+			_, _ = w.Write([]byte(catalogHTML(1, 100)))
+		case "2":
+			_, _ = w.Write([]byte(catalogHTML(101, 1)))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	adapter := source.NewNaro(testClient())
+	adapter.APIBase = server.URL + "/novelapi/api/"
+	adapter.CatalogBase = server.URL + "/"
+	got, err := adapter.Fetch(context.Background(), "https://ncode.syosetu.com/n2166fe/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Complete || len(got.Releases) != 101 || got.Count != 101 {
+		t.Fatalf("complete=%v releases=%d count=%d", got.Complete, len(got.Releases), got.Count)
+	}
+}
+
+func TestNaroMissingCountDoesNotUseAllCount(t *testing.T) {
+	api := strings.Replace(string(fixture(t, "naro_api.json")), `"general_all_no":3,`, ``, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/novelapi/api/" {
+			_, _ = w.Write([]byte(api))
+			return
+		}
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	adapter := source.NewNaro(testClient())
+	adapter.APIBase = server.URL + "/novelapi/api/"
+	adapter.CatalogBase = server.URL + "/"
+	got, err := adapter.Fetch(context.Background(), "https://ncode.syosetu.com/n2166fe/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Mode != domain.ModeCountOnly || got.Count != 0 {
+		t.Fatalf("mode=%q count=%d, want count_only/0", got.Mode, got.Count)
+	}
+}

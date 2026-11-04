@@ -31,6 +31,7 @@ func TestAllowIP(t *testing.T) {
 		"127.0.0.1", "::1", "10.0.0.1", "172.16.0.1", "192.168.1.1",
 		"169.254.1.1", "100.64.0.1", "198.18.0.1", "240.0.0.1",
 		"fc00::1", "fe80::1", "0.0.0.0", "224.0.0.1",
+		"::127.0.0.1", "64:ff9b::7f00:1", "2002:7f00:1::", "fec0::1",
 	}
 	for _, raw := range blocked {
 		if client.allowIP(net.ParseIP(raw)) {
@@ -213,5 +214,42 @@ func TestInvalidURLs(t *testing.T) {
 		if !ok || hErr.Code != CodeInvalidURL {
 			t.Errorf("%q: err = %#v", raw, err)
 		}
+	}
+}
+
+func TestBodyReadTimeoutIsTyped(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("partial"))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		time.Sleep(150 * time.Millisecond)
+	}))
+	defer server.Close()
+	cfg := testConfig()
+	cfg.Timeout = 40 * time.Millisecond
+	_, err := New(cfg).Get(context.Background(), server.URL)
+	hErr, ok := err.(*Error)
+	if !ok || hErr.Code != CodeSourceTimeout {
+		t.Fatalf("err = %#v", err)
+	}
+}
+
+func TestCancellationDuringRetryWaitIsTyped(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "10")
+		http.Error(w, "slow down", http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+	cfg := testConfig()
+	cfg.MaxRetries = 1
+	cfg.Timeout = 2 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Millisecond)
+	defer cancel()
+	_, err := New(cfg).Get(ctx, server.URL)
+	hErr, ok := err.(*Error)
+	if !ok || hErr.Code != CodeSourceTimeout {
+		t.Fatalf("err = %#v", err)
 	}
 }

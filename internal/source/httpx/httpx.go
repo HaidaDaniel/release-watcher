@@ -153,7 +153,7 @@ func (c *Client) Get(ctx context.Context, raw string) (*Response, error) {
 	attempts := c.cfg.MaxRetries + 1
 	for attempt := 0; attempt < attempts; attempt++ {
 		if err := c.limiter.wait(ctx, u.Hostname()); err != nil {
-			return nil, err
+			return nil, classifyError(err)
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 		if err != nil {
@@ -168,7 +168,7 @@ func (c *Client) Get(ctx context.Context, raw string) (*Response, error) {
 			if mapped.Temporary && attempt < attempts-1 {
 				lastErr = mapped
 				if !sleepContext(ctx, backoff(attempt)) {
-					return nil, ctx.Err()
+					return nil, classifyError(ctx.Err())
 				}
 				continue
 			}
@@ -178,11 +178,14 @@ func (c *Client) Get(ctx context.Context, raw string) (*Response, error) {
 		body, readErr := readLimited(resp.Body, c.cfg.MaxBodyBytes)
 		_ = resp.Body.Close()
 		if readErr != nil {
-			mapped := &Error{Code: CodeFetchFailed, Message: "cannot read response body", Temporary: true, Cause: readErr}
-			if attempt < attempts-1 {
+			mapped := classifyError(readErr)
+			if errors.Is(readErr, errBodyTooLarge) {
+				mapped = &Error{Code: CodeFetchFailed, Message: "response body is too large", Cause: readErr}
+			}
+			if mapped.Temporary && attempt < attempts-1 {
 				lastErr = mapped
 				if !sleepContext(ctx, backoff(attempt)) {
-					return nil, ctx.Err()
+					return nil, classifyError(ctx.Err())
 				}
 				continue
 			}
@@ -206,7 +209,7 @@ func (c *Client) Get(ctx context.Context, raw string) (*Response, error) {
 				wait = backoff(attempt)
 			}
 			if !sleepContext(ctx, wait) {
-				return nil, ctx.Err()
+				return nil, classifyError(ctx.Err())
 			}
 			continue
 		}
@@ -271,11 +274,34 @@ func (c *Client) allowIP(ip net.IP) bool {
 		}
 		return true
 	}
-	if len(ip) == net.IPv6len && (ip[0]&0xfe) == 0xfc {
-		return false // fc00::/7 unique local
+	if len(ip) == net.IPv6len {
+		if (ip[0] & 0xfe) == 0xfc {
+			return false // fc00::/7 unique local
+		}
+		if ip[0] == 0xfe && (ip[1]&0xc0) == 0xc0 {
+			return false // fec0::/10 deprecated site-local
+		}
+		if ip[0] == 0x20 && ip[1] == 0x02 {
+			return false // 2002::/16 6to4
+		}
+		if ip[0] == 0x00 && ip[1] == 0x64 && ip[2] == 0xff && ip[3] == 0x9b {
+			return false // 64:ff9b::/96 NAT64
+		}
+		zeroPrefix := true
+		for i := 0; i < 12; i++ {
+			if ip[i] != 0 {
+				zeroPrefix = false
+				break
+			}
+		}
+		if zeroPrefix {
+			return false // IPv4-compatible ::/96 (deprecated)
+		}
 	}
 	return true
 }
+
+var errBodyTooLarge = errors.New("response body too large")
 
 func readLimited(r io.Reader, max int64) ([]byte, error) {
 	data, err := io.ReadAll(io.LimitReader(r, max+1))
@@ -283,7 +309,7 @@ func readLimited(r io.Reader, max int64) ([]byte, error) {
 		return nil, err
 	}
 	if int64(len(data)) > max {
-		return nil, fmt.Errorf("response exceeds %d bytes", max)
+		return nil, fmt.Errorf("%w: limit %d bytes", errBodyTooLarge, max)
 	}
 	return data, nil
 }

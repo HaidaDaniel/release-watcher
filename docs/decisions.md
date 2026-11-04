@@ -23,7 +23,7 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Date: 2026-11-04
 - Status: Accepted
 - Decision: Narō metadata comes from `api.syosetu.com/novelapi/api/`. Stable chapter identities and titles come from the public catalog pages on `ncode.syosetu.com`. The adapter treats `general_all_no` as a count and `end` as an explicit completion field only when present. It never treats inactivity as completion. The first observation is stored as a baseline with no release events. If catalog pages are unavailable but the API count works, the adapter may degrade to `count_only`; when catalog data returns, it reconciles silently before resuming detection.
-- Consequences: A newly added 210-chapter work does not produce a false "210 new chapters" event. The adapter makes at most a bounded number of polite catalog requests and must handle pagination.
+- Consequences: A newly added 210-chapter work does not produce a false "210 new chapters" event. The adapter makes at most a bounded number of polite catalog requests and must handle pagination. `general_all_no` is the chapter count; `allcount` is only the number of API search results. A catalog is marked complete only after a short or empty page proves exhaustion, not merely because the parsed length equals the API count. Partial catalogs are never used for removal detection.
 
 ## ADR-0004 — Publication lines are never merged by title
 
@@ -50,7 +50,7 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 
 - Date: 2026-11-04
 - Status: Accepted
-- Decision: All adapter HTTP traffic goes through a shared client that only allows `http`/`https`, limits redirects, applies timeouts, bounds response bodies, paces requests per host and retries 429/5xx with backoff. A custom dialer resolves the host and rejects loopback, private, link-local, CGNAT, multicast, benchmarking, reserved and unspecified addresses at dial time, which also covers redirects and DNS rebinding. Environment HTTP proxies are disabled so a proxy cannot bypass the address check. An explicit test/dev setting may allow private hosts; it is off by default.
+- Decision: All adapter HTTP traffic goes through a shared client that only allows `http`/`https`, limits redirects, applies timeouts, bounds response bodies, paces requests per host and retries 429/5xx with backoff. A custom dialer resolves the host and rejects loopback, private, link-local, CGNAT, multicast, benchmarking, reserved and unspecified addresses at dial time, which also covers redirects and DNS rebinding. IPv4-compatible, IPv4-mapped, NAT64, 6to4 and deprecated site-local IPv6 forms are rejected as well. Environment HTTP proxies are disabled so a proxy cannot bypass the address check. An explicit test/dev setting may allow private hosts; it is off by default. Body-read timeouts and cancellation during pacing/retry waits are returned as typed source errors.
 - Consequences: Tests use local HTTP servers with the explicit setting. No CAPTCHA, login or paywall bypass exists.
 
 ## ADR-0008 — Local hooks and APK; no CI until a working MVP

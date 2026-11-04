@@ -116,9 +116,30 @@ func (r *Registry) Fetch(ctx context.Context, rawURL string) (*Snapshot, error) 
 func (r *Registry) FetchByKind(ctx context.Context, kind domain.SourceKind, rawURL string) (*Snapshot, error) {
 	switch kind {
 	case domain.SourceNaro:
-		return r.naro.Fetch(ctx, rawURL)
+		u, err := httpx.ValidateURL(rawURL)
+		if err != nil {
+			return nil, mapHTTPError(err)
+		}
+		if !r.naro.Match(u) {
+			return nil, &Error{Code: CodeUnsupportedSource, Message: "stored source kind is naro but the URL is not a Narō novel URL"}
+		}
+		snapshot, err := r.naro.Fetch(ctx, rawURL)
+		if err != nil {
+			return nil, err
+		}
+		if snapshot.SourceKind != domain.SourceNaro {
+			return nil, &Error{Code: CodeUnsupportedSource, Message: "source adapter returned a mismatched source kind"}
+		}
+		return snapshot, nil
 	case domain.SourceRSS, domain.SourceAtom:
-		return r.feed.Fetch(ctx, rawURL)
+		snapshot, err := r.feed.Fetch(ctx, rawURL)
+		if err != nil {
+			return nil, err
+		}
+		if snapshot.SourceKind != domain.SourceRSS && snapshot.SourceKind != domain.SourceAtom {
+			return nil, &Error{Code: CodeUnsupportedSource, Message: "feed adapter returned a mismatched source kind"}
+		}
+		return snapshot, nil
 	default:
 		return nil, &Error{Code: CodeUnsupportedSource, Message: fmt.Sprintf("unsupported source kind %q", kind)}
 	}
