@@ -43,7 +43,7 @@ func mapError(err error) *Error {
 		return &Error{Code: sourceErr.Code, Message: sourceErr.Message, Cause: sourceErr.Cause}
 	}
 	if errors.Is(err, lock.ErrLocked) {
-		return &Error{Code: "locked", Message: "another scan is already running", Cause: err}
+		return &Error{Code: "locked", Message: "another release-watcher operation is already running", Cause: err}
 	}
 	if errors.Is(err, store.ErrNotFound) {
 		return &Error{Code: "not_found", Message: "requested record was not found", Cause: err}

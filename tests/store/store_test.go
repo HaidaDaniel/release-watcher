@@ -550,14 +550,14 @@ func TestListPublicationsDoesNotDeadlock(t *testing.T) {
 		t.Fatalf("list publications: %v", err)
 	}
 	if len(pubs) != 2 {
-		t.Fatalf("publications = %d, want 3", len(pubs))
+		t.Fatalf("publications = %d, want 2", len(pubs))
 	}
 	watches, err := s.Queries().ListWatches(ctx)
 	if err != nil {
 		t.Fatalf("list watches: %v", err)
 	}
 	if len(watches) != 2 {
-		t.Fatalf("watches = %d, want 3", len(watches))
+		t.Fatalf("watches = %d, want 2", len(watches))
 	}
 }
 

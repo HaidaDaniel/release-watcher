@@ -150,7 +150,7 @@ A durable attempt to deliver one event over one channel.
 | `last_error` | bounded, secret-free error |
 | `sent_at` | success time |
 
-A unique `(event_id, channel)` constraint prevents duplicate deliveries. Retrying a failed delivery never creates a second event. `remove` atomically marks that watch's pending and failed deliveries `canceled`; canceled is terminal and is never selected for delivery again, including after restart or re-add. `remove`/`purge` serialize with scans and notifies through the process lock; a watch removed while a scan is already in flight is skipped before event creation. `pause` does not cancel deliveries.
+A unique `(event_id, channel)` constraint prevents duplicate deliveries. Retrying a failed delivery never creates a second event. `remove` atomically marks that watch's pending and failed deliveries `canceled`; canceled is terminal and is never selected for delivery again, including after restart or re-add. `remove`/`purge` serialize with scans and notifies through the process lock and return `locked` while another operation is active. As defense in depth, a scan that already fetched data re-checks `removed_at` and skips removed watches before event creation. `pause` does not cancel deliveries.
 
 ## ScanRun
 
