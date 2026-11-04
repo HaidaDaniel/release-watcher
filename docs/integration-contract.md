@@ -65,7 +65,7 @@ Stable error codes:
 | `ssrf_blocked` | target resolves to a disallowed address |
 | `not_found` | watch/publication/event id not found |
 | `invalid_argument` | a flag or value is invalid (for example an interval below 1m) |
-| `locked` | another scan holds the lock |
+| `locked` | another release-watcher operation holds the process lock |
 | `storage_error` | SQLite/migration/backup failure |
 | `notification_failed` | delivery attempt failed (events remain stored) |
 | `config_error` | invalid environment/configuration |
