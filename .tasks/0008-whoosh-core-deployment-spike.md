@@ -1,6 +1,6 @@
 # Task 0008 - Whoosh Core deployment spike
 
-State: todo
+State: blocked
 Owner: none
 Mode: mvp
 Lane: deployment
@@ -56,3 +56,4 @@ Run a recorded Whoosh Core spike on a test Linux host: deploy the prebuilt Relea
 ## Notes
 
 - Do not call this production deployment. Do not turn Whoosh into a runtime dependency or add a third deployment repository.
+- block: Blocked on a real Linux test host and explicit deployment permission. The functional MVP is verified locally, but no target host was provided for Whoosh Core installation, timer/reboot/linger verification, repeat deploy or rollback.
