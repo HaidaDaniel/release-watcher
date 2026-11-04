@@ -12,9 +12,12 @@ import (
 
 func (r *runner) printAdd(result *app.AddResult) {
 	title := displayWatch(result.WatchView, r.lang)
-	if result.Created {
+	switch {
+	case result.Created:
 		fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Добавлено", "Added"), title)
-	} else {
+	case result.Reason == "restored":
+		fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Наблюдение восстановлено", "Watching restored"), title)
+	default:
 		fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Уже отслеживается", "Already watched"), title)
 	}
 	fmt.Fprintf(r.stdout, "watch_id: %s\n", result.WatchID)
@@ -56,6 +59,9 @@ func (r *runner) printShow(result *app.ShowResult) {
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Статус", "Status"), statusText(r.lang, watch.Status, watch.StatusKnown))
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Интервал", "Interval"), formatInterval(watch.IntervalSeconds))
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Включено", "Enabled"), yesNo(r.lang, watch.Enabled))
+	if watch.RemovedAt != nil {
+		fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Наблюдение остановлено", "Watching stopped"), formatTimePtr(watch.RemovedAt))
+	}
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Последняя проверка", "Last check"), formatTimePtr(watch.LastCheckedAt))
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Следующая проверка", "Next check"), formatTimeValue(watch.NextCheckAt))
 	if watch.LastErrorCategory != nil {
@@ -200,6 +206,9 @@ func (r *runner) printWatch(watch *app.WatchView) {
 	fmt.Fprintf(r.stdout, "watch_id: %s\n", watch.WatchID)
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Название", "Title"), displayWatch(*watch, r.lang))
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Включено", "Enabled"), yesNo(r.lang, watch.Enabled))
+	if watch.RemovedAt != nil {
+		fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Наблюдение остановлено", "Watching stopped"), formatTimePtr(watch.RemovedAt))
+	}
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Интервал", "Interval"), formatInterval(watch.IntervalSeconds))
 	fmt.Fprintf(r.stdout, "%s: %s\n", r.t("Следующая проверка", "Next check"), formatTimeValue(watch.NextCheckAt))
 }

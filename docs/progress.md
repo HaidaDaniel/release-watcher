@@ -16,7 +16,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Lefthook pre-commit/pre-push configuration and local verification scripts; pre-push requires pnpm/APK lint and the secret scanner prints only file/line/type.
 - Linux systemd service/timer skeletons.
 - Build script for linux/amd64 and linux/arm64 with ldflags identity.
-- Domain entities and SQLite schema version 1 with Work, Source, Publication, Watch, Release, Event, NotificationDelivery, ScanRun and Setting tables.
+- Domain entities and SQLite schema version 2 with Work, Source, Publication, Watch, Release, Event, NotificationDelivery, ScanRun and Setting tables.
 - Transactional repository layer with event/delivery dedupe and due-watch queries.
 - SSRF-safe HTTP client with timeout, redirect limit, per-host pacing, retries, body limits and no environment proxy.
 - Narō adapter using the official novel API plus paginated catalog pages, with complete/partial/count_only snapshots and the official `end` mapping (`0` completed/short story, `1` ongoing, unknown otherwise).
