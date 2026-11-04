@@ -1,7 +1,7 @@
 # Task 0018 - Cancel pending notifications when a watch is removed
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Type: bugfix
