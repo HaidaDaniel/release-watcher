@@ -14,6 +14,12 @@ const releaseColumns = `id, publication_id, external_id, kind, number, title, ur
 	published_at, source_updated_at, content_hash, is_baseline, first_seen_at, last_seen_at, removed_at`
 
 func (q *Queries) InsertRelease(ctx context.Context, r *domain.Release) error {
+	if !r.Kind.Valid() {
+		return fmt.Errorf("store: invalid release kind %q", r.Kind)
+	}
+	if r.ExternalID == "" {
+		return fmt.Errorf("store: release external id is required")
+	}
 	_, err := q.q.ExecContext(ctx,
 		`INSERT INTO release (`+releaseColumns+`)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

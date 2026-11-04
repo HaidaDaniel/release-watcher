@@ -18,7 +18,16 @@ const eventColumns = `id, event_type, publication_id, watch_id, source_id,
 // InsertEvent inserts an event unless its dedupe key already exists. It returns
 // true when a new row was created.
 func (q *Queries) InsertEvent(ctx context.Context, e *domain.Event) (bool, error) {
-	releaseIDs, err := json.Marshal(e.ReleaseIDs)
+	if !e.Type.Valid() {
+		return false, fmt.Errorf("store: invalid event type %q", e.Type)
+	}
+	if e.SchemaVersion == "" || e.DedupeKey == "" {
+		return false, fmt.Errorf("store: event schema version and dedupe key are required")
+	}
+	if len(e.Payload) == 0 || !json.Valid(e.Payload) {
+		return false, fmt.Errorf("store: event payload must be valid JSON")
+	}
+	releaseIDs, err := json.Marshal(nonNilStrings(e.ReleaseIDs))
 	if err != nil {
 		return false, fmt.Errorf("store: encode release ids: %w", err)
 	}
@@ -81,8 +90,16 @@ func (q *Queries) ListEvents(ctx context.Context, filter EventFilter) ([]domain.
 		args = append(args, formatTime(*filter.Since))
 	}
 	if filter.After != "" {
-		query += ` AND (detected_at, id) > (SELECT detected_at, id FROM event WHERE id = ?)`
-		args = append(args, filter.After)
+		var cursorTime string
+		err := q.q.QueryRowContext(ctx, `SELECT detected_at FROM event WHERE id = ?`, filter.After).Scan(&cursorTime)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		if err != nil {
+			return nil, fmt.Errorf("store: resolve event cursor: %w", err)
+		}
+		query += ` AND (detected_at > ? OR (detected_at = ? AND id > ?))`
+		args = append(args, cursorTime, cursorTime, filter.After)
 	}
 	query += ` ORDER BY detected_at ASC, id ASC LIMIT ?`
 	args = append(args, filter.Limit)
@@ -137,6 +154,7 @@ func scanEvent(row rowScanner) (*domain.Event, error) {
 	if err := json.Unmarshal([]byte(releaseIDs), &e.ReleaseIDs); err != nil {
 		return nil, fmt.Errorf("store: decode release ids: %w", err)
 	}
+	e.ReleaseIDs = nonNilStrings(e.ReleaseIDs)
 	e.PreviousCount = scanInt64Ptr(previous)
 	e.CurrentCount = scanInt64Ptr(current)
 	e.CountDelta = scanInt64Ptr(delta)

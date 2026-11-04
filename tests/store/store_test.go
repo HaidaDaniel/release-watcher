@@ -63,7 +63,6 @@ func createFixture(t *testing.T, s *store.Store, suffix string, enabled bool, ne
 		Status:       domain.StatusCompleted,
 		StatusSource: "naro:end",
 		NextCheckAt:  &nextCheck,
-		Mode:         domain.ModeCatalog,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -311,5 +310,169 @@ func TestSettingRoundTrip(t *testing.T) {
 	got, _ = s.Queries().GetSetting(ctx, "default_interval_seconds")
 	if got.Value != "21600" {
 		t.Fatalf("setting = %q", got.Value)
+	}
+}
+
+func TestDeleteObservationRemovesOwnedData(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	f := createFixture(t, s, "N6000AA", true, time.Now().UTC())
+	now := time.Now().UTC().Truncate(time.Second)
+
+	release := &domain.Release{
+		ID: id.New("rel"), PublicationID: f.publication.ID, ExternalID: "N6000AA/1",
+		Kind: domain.ReleaseChapter, ContentHash: "h", FirstSeenAt: now, LastSeenAt: now,
+	}
+	if err := s.Queries().InsertRelease(ctx, release); err != nil {
+		t.Fatal(err)
+	}
+	event := &domain.Event{
+		ID: id.New("evt"), Type: domain.EventReleaseAdded, PublicationID: f.publication.ID,
+		WatchID: f.watch.ID, SourceID: f.source.ID, ExternalWorkReference: "ncode:N6000AA",
+		ReleaseIDs: []string{"N6000AA/1"}, Payload: json.RawMessage(`{"x":1}`),
+		DedupeKey: "remove-1", SchemaVersion: "1.0", DetectedAt: now, CreatedAt: now,
+	}
+	if _, err := s.Queries().InsertEvent(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	delivery := &domain.NotificationDelivery{
+		ID: id.New("del"), EventID: event.ID, Channel: "telegram", Status: domain.DeliveryPending,
+		NextAttemptAt: now, CreatedAt: now, UpdatedAt: now,
+	}
+	if _, err := s.Queries().InsertDelivery(ctx, delivery); err != nil {
+		t.Fatal(err)
+	}
+	run := &domain.ScanRun{
+		ID: id.New("scan"), WatchID: f.watch.ID, PublicationID: f.publication.ID,
+		StartedAt: now, FinishedAt: now, Result: domain.ScanOK, EventsCreated: 1, DurationMillis: 5,
+	}
+	if err := s.Queries().InsertScanRun(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.Queries().DeleteObservation(ctx, f.watch.ID); err != nil {
+		t.Fatalf("delete observation: %v", err)
+	}
+	if _, err := s.Queries().GetWatch(ctx, f.watch.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("watch still exists: %v", err)
+	}
+	if _, err := s.Queries().GetPublication(ctx, f.publication.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("publication still exists: %v", err)
+	}
+	if _, err := s.Queries().GetWork(ctx, f.work.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("work still exists: %v", err)
+	}
+	if _, err := s.Queries().GetSource(ctx, f.source.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("source still exists: %v", err)
+	}
+	all, err := s.Queries().ListReleasesByPublication(ctx, f.publication.ID, true, 10)
+	if err != nil || len(all) != 0 {
+		t.Fatalf("releases remain: %+v err=%v", all, err)
+	}
+	events, err := s.Queries().ListEvents(ctx, store.EventFilter{PublicationID: f.publication.ID})
+	if err != nil || len(events) != 0 {
+		t.Fatalf("events remain: %+v err=%v", events, err)
+	}
+}
+
+func TestNilSlicesArePersistedAsEmptyArrays(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	source := &domain.Source{ID: id.New("src"), Kind: domain.SourceRSS, URI: "https://example.test/feed", ExternalID: "feed-1", FieldsAvailable: nil, CreatedAt: now, UpdatedAt: now}
+	if err := s.Queries().CreateSource(ctx, source); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Queries().GetSource(ctx, source.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.FieldsAvailable == nil || len(got.FieldsAvailable) != 0 {
+		t.Fatalf("fields = %#v, want non-nil empty slice", got.FieldsAvailable)
+	}
+
+	work := &domain.Work{ID: id.New("work"), OriginalTitle: "nil-slice", CreatedAt: now, UpdatedAt: now}
+	pub := &domain.Publication{ID: id.New("pub"), WorkID: work.ID, SourceID: source.ID, Type: domain.PublicationUnknown, OriginalURL: "https://example.test/feed", Status: domain.StatusUnknown, CreatedAt: now, UpdatedAt: now}
+	watch := &domain.Watch{ID: id.New("watch"), PublicationID: pub.ID, Enabled: true, IntervalSeconds: 86400, Mode: domain.ModeCatalog, NextCheckAt: now, CreatedAt: now, UpdatedAt: now}
+	if err := s.InTx(ctx, func(q *store.Queries) error {
+		if err := q.CreateWork(ctx, work); err != nil {
+			return err
+		}
+		if err := q.CreatePublication(ctx, pub); err != nil {
+			return err
+		}
+		return q.CreateWatch(ctx, watch)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	event := &domain.Event{ID: id.New("evt"), Type: domain.EventReleaseAdded, PublicationID: pub.ID, WatchID: watch.ID, SourceID: source.ID, ExternalWorkReference: "feed-1", ReleaseIDs: nil, Payload: json.RawMessage(`{}`), DedupeKey: "nil-slice", SchemaVersion: "1.0", DetectedAt: now, CreatedAt: now}
+	if _, err := s.Queries().InsertEvent(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	gotEvent, err := s.Queries().GetEvent(ctx, event.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotEvent.ReleaseIDs == nil || len(gotEvent.ReleaseIDs) != 0 {
+		t.Fatalf("release ids = %#v, want non-nil empty slice", gotEvent.ReleaseIDs)
+	}
+}
+
+func TestInvalidEnumsAndPayloadRejected(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	if err := s.Queries().CreateSource(ctx, &domain.Source{ID: id.New("src"), Kind: "bogus", URI: "x", ExternalID: "x", CreatedAt: now, UpdatedAt: now}); err == nil {
+		t.Fatal("invalid source kind accepted")
+	}
+	if err := s.Queries().CreatePublication(ctx, &domain.Publication{ID: id.New("pub"), WorkID: "w", SourceID: "s", Type: "bogus", OriginalURL: "x", Status: domain.StatusUnknown, CreatedAt: now, UpdatedAt: now}); err == nil {
+		t.Fatal("invalid publication type accepted")
+	}
+	if err := s.Queries().CreateWatch(ctx, &domain.Watch{ID: id.New("watch"), PublicationID: "p", Enabled: true, IntervalSeconds: 1, Mode: "bogus", NextCheckAt: now, CreatedAt: now, UpdatedAt: now}); err == nil {
+		t.Fatal("invalid watch mode accepted")
+	}
+	if err := s.Queries().InsertRelease(ctx, &domain.Release{ID: id.New("rel"), PublicationID: "p", ExternalID: "x", Kind: "bogus", ContentHash: "h", FirstSeenAt: now, LastSeenAt: now}); err == nil {
+		t.Fatal("invalid release kind accepted")
+	}
+	if err := s.Queries().InsertScanRun(ctx, &domain.ScanRun{ID: id.New("scan"), WatchID: "w", PublicationID: "p", StartedAt: now, FinishedAt: now, Result: "bogus"}); err == nil {
+		t.Fatal("invalid scan result accepted")
+	}
+	if _, err := s.Queries().InsertEvent(ctx, &domain.Event{ID: id.New("evt"), Type: "bogus", DedupeKey: "x", SchemaVersion: "1.0", Payload: json.RawMessage(`{}`)}); err == nil {
+		t.Fatal("invalid event type accepted")
+	}
+	if _, err := s.Queries().InsertEvent(ctx, &domain.Event{ID: id.New("evt"), Type: domain.EventReleaseAdded, DedupeKey: "x", SchemaVersion: "1.0", Payload: nil}); err == nil {
+		t.Fatal("empty event payload accepted")
+	}
+	if _, err := s.Queries().InsertDelivery(ctx, &domain.NotificationDelivery{ID: id.New("del"), EventID: "e", Channel: "telegram", Status: "bogus", NextAttemptAt: now, CreatedAt: now, UpdatedAt: now}); err == nil {
+		t.Fatal("invalid delivery status accepted")
+	}
+}
+
+func TestUnknownEventCursorReturnsNotFound(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	_, err := s.Queries().ListEvents(ctx, store.EventFilter{After: "evt_missing", Limit: 10})
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestConcurrentOpenRetries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "concurrent.db")
+	const workers = 8
+	errs := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			st, err := store.Open(context.Background(), path)
+			if err == nil {
+				err = st.Close()
+			}
+			errs <- err
+		}()
+	}
+	for i := 0; i < workers; i++ {
+		if err := <-errs; err != nil {
+			t.Fatalf("concurrent open failed: %v", err)
+		}
 	}
 }

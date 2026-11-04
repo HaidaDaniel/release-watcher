@@ -89,7 +89,7 @@ A specific observation of a Publication.
 | `paused_at` | nullable |
 | `created_at`, `updated_at` | local timestamps |
 
-Pause/resume changes only scheduling. Removing a watch removes the observation and its owned data; it does not silently modify another publication line.
+Pause/resume changes only scheduling. Removing a watch deletes the observation, its publication line, releases, events, deliveries and scan runs in one transaction. The Work and Source rows are removed only when no other publication line still references them. Removing one watch never silently modifies another publication line.
 
 ## Release
 

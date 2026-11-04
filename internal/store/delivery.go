@@ -14,6 +14,12 @@ const deliveryColumns = `id, event_id, channel, status, attempts, next_attempt_a
 
 // InsertDelivery inserts a delivery unless (event_id, channel) already exists.
 func (q *Queries) InsertDelivery(ctx context.Context, d *domain.NotificationDelivery) (bool, error) {
+	if !d.Status.Valid() {
+		return false, fmt.Errorf("store: invalid delivery status %q", d.Status)
+	}
+	if d.Channel == "" {
+		return false, fmt.Errorf("store: delivery channel is required")
+	}
 	res, err := q.q.ExecContext(ctx,
 		`INSERT INTO notification_delivery (`+deliveryColumns+`)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

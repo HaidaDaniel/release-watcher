@@ -81,6 +81,15 @@ const (
 	ReleaseOther   ReleaseKind = "other"
 )
 
+func (k ReleaseKind) Valid() bool {
+	switch k {
+	case ReleaseChapter, ReleaseVolume, ReleaseBook, ReleaseEntry, ReleaseOther:
+		return true
+	default:
+		return false
+	}
+}
+
 type EventType string
 
 const (
@@ -123,6 +132,15 @@ const (
 	ScanError     ScanResult = "error"
 )
 
+func (r ScanResult) Valid() bool {
+	switch r {
+	case ScanBaseline, ScanOK, ScanUnchanged, ScanError:
+		return true
+	default:
+		return false
+	}
+}
+
 // Work is a logical work, for example one web novel.
 type Work struct {
 	ID            string
@@ -157,7 +175,6 @@ type Publication struct {
 	LastCheckedAt   *time.Time
 	NextCheckAt     *time.Time
 	ReleaseCount    *int64
-	Mode            WatchMode
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

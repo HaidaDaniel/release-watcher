@@ -15,6 +15,12 @@ const watchColumns = `id, publication_id, enabled, interval_seconds, baseline_es
 	consecutive_failures, paused_at, created_at, updated_at`
 
 func (q *Queries) CreateWatch(ctx context.Context, w *domain.Watch) error {
+	if !w.Mode.Valid() {
+		return fmt.Errorf("store: invalid watch mode %q", w.Mode)
+	}
+	if w.IntervalSeconds <= 0 {
+		return fmt.Errorf("store: watch interval must be positive")
+	}
 	_, err := q.q.ExecContext(ctx,
 		`INSERT INTO watch (`+watchColumns+`)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -200,12 +206,57 @@ func (q *Queries) SetWatchEnabled(ctx context.Context, id string, enabled bool, 
 	return expectOne(res)
 }
 
-func (q *Queries) DeleteWatch(ctx context.Context, id string) error {
-	res, err := q.q.ExecContext(ctx, `DELETE FROM watch WHERE id = ?`, id)
-	if err != nil {
-		return fmt.Errorf("store: delete watch: %w", err)
+// DeleteObservation removes a watch, its publication line, releases, events,
+// deliveries and scan runs in one transaction. Work and Source rows are removed
+// only when no other publication line references them. It is the storage side
+// of the user-facing remove command.
+func (q *Queries) DeleteObservation(ctx context.Context, watchID string) error {
+	var publicationID string
+	err := q.q.QueryRowContext(ctx,
+		`SELECT publication_id FROM watch WHERE id = ?`, watchID,
+	).Scan(&publicationID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
 	}
-	return expectOne(res)
+	if err != nil {
+		return fmt.Errorf("store: find watch for removal: %w", err)
+	}
+
+	var workID, sourceID string
+	if err := q.q.QueryRowContext(ctx,
+		`SELECT work_id, source_id FROM publication WHERE id = ?`, publicationID,
+	).Scan(&workID, &sourceID); err != nil {
+		return fmt.Errorf("store: find publication for removal: %w", err)
+	}
+
+	if _, err := q.q.ExecContext(ctx, `DELETE FROM publication WHERE id = ?`, publicationID); err != nil {
+		return fmt.Errorf("store: delete publication: %w", err)
+	}
+	if err := deleteIfUnreferenced(ctx, q.q, "work", workID); err != nil {
+		return err
+	}
+	if err := deleteIfUnreferenced(ctx, q.q, "source", sourceID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteIfUnreferenced(ctx context.Context, db DBTX, table, id string) error {
+	var count int
+	query := `SELECT COUNT(*) FROM publication WHERE work_id = ?`
+	if table == "source" {
+		query = `SELECT COUNT(*) FROM publication WHERE source_id = ?`
+	}
+	if err := db.QueryRowContext(ctx, query, id).Scan(&count); err != nil {
+		return fmt.Errorf("store: check %s references: %w", table, err)
+	}
+	if count > 0 {
+		return nil
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM `+table+` WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("store: delete %s: %w", table, err)
+	}
+	return nil
 }
 
 func boolInt(v bool) int {

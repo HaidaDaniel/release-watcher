@@ -11,14 +11,20 @@ import (
 )
 
 func (q *Queries) CreatePublication(ctx context.Context, p *domain.Publication) error {
+	if !p.Type.Valid() {
+		return fmt.Errorf("store: invalid publication type %q", p.Type)
+	}
+	if !p.Status.Valid() {
+		return fmt.Errorf("store: invalid publication status %q", p.Status)
+	}
 	_, err := q.q.ExecContext(ctx,
 		`INSERT INTO publication (
 			id, work_id, source_id, publication_type, original_url, status, status_source,
-			last_published_at, last_checked_at, next_check_at, release_count, mode, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			last_published_at, last_checked_at, next_check_at, release_count, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.ID, p.WorkID, p.SourceID, string(p.Type), p.OriginalURL, string(p.Status), nullIfEmpty(p.StatusSource),
 		formatTimePtr(p.LastPublishedAt), formatTimePtr(p.LastCheckedAt), formatTimePtr(p.NextCheckAt),
-		int64PtrValue(p.ReleaseCount), string(p.Mode), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
+		int64PtrValue(p.ReleaseCount), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("store: create publication: %w", err)
@@ -29,7 +35,7 @@ func (q *Queries) CreatePublication(ctx context.Context, p *domain.Publication) 
 func (q *Queries) GetPublication(ctx context.Context, id string) (*domain.Publication, error) {
 	var (
 		p                             domain.Publication
-		ptype, status, mode           string
+		ptype, status                 string
 		statusSource                  sql.NullString
 		lastPub, lastCheck, nextCheck sql.NullString
 		releaseCount                  sql.NullInt64
@@ -37,10 +43,10 @@ func (q *Queries) GetPublication(ctx context.Context, id string) (*domain.Public
 	)
 	err := q.q.QueryRowContext(ctx,
 		`SELECT id, work_id, source_id, publication_type, original_url, status, status_source,
-		        last_published_at, last_checked_at, next_check_at, release_count, mode, created_at, updated_at
+		        last_published_at, last_checked_at, next_check_at, release_count, created_at, updated_at
 		 FROM publication WHERE id = ?`, id,
 	).Scan(&p.ID, &p.WorkID, &p.SourceID, &ptype, &p.OriginalURL, &status, &statusSource,
-		&lastPub, &lastCheck, &nextCheck, &releaseCount, &mode, &created, &updated)
+		&lastPub, &lastCheck, &nextCheck, &releaseCount, &created, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -50,7 +56,6 @@ func (q *Queries) GetPublication(ctx context.Context, id string) (*domain.Public
 	p.Type = domain.PublicationType(ptype)
 	p.Status = domain.Status(status)
 	p.StatusSource = statusSource.String
-	p.Mode = domain.WatchMode(mode)
 	if p.LastPublishedAt, err = scanTime(lastPub); err != nil {
 		return nil, err
 	}
@@ -109,14 +114,17 @@ func (q *Queries) ListPublications(ctx context.Context) ([]domain.Publication, e
 
 // UpdatePublicationAfterScan records observation facts and schedule state.
 func (q *Queries) UpdatePublicationAfterScan(ctx context.Context, p *domain.Publication, now time.Time) error {
+	if !p.Status.Valid() {
+		return fmt.Errorf("store: invalid publication status %q", p.Status)
+	}
 	res, err := q.q.ExecContext(ctx,
 		`UPDATE publication SET
 			status = ?, status_source = ?, last_published_at = ?, last_checked_at = ?,
-			next_check_at = ?, release_count = ?, mode = ?, updated_at = ?
+			next_check_at = ?, release_count = ?, updated_at = ?
 		 WHERE id = ?`,
 		string(p.Status), nullIfEmpty(p.StatusSource), formatTimePtr(p.LastPublishedAt),
 		formatTimePtr(p.LastCheckedAt), formatTimePtr(p.NextCheckAt),
-		int64PtrValue(p.ReleaseCount), string(p.Mode), formatTime(now), p.ID,
+		int64PtrValue(p.ReleaseCount), formatTime(now), p.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("store: update publication: %w", err)

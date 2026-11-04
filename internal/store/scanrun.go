@@ -9,6 +9,9 @@ import (
 )
 
 func (q *Queries) InsertScanRun(ctx context.Context, r *domain.ScanRun) error {
+	if !r.Result.Valid() {
+		return fmt.Errorf("store: invalid scan result %q", r.Result)
+	}
 	_, err := q.q.ExecContext(ctx,
 		`INSERT INTO scan_run (id, watch_id, publication_id, started_at, finished_at,
 			result, events_created, error_code, error_message, duration_ms)

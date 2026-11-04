@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -45,6 +46,26 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("store: create state directory: %w", err)
 	}
 
+	var lastErr error
+	for attempt := 0; attempt < 6; attempt++ {
+		s, err := openOnce(ctx, abs)
+		if err == nil {
+			return s, nil
+		}
+		lastErr = err
+		if !isBusyError(err) {
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(attempt+1) * 100 * time.Millisecond):
+		}
+	}
+	return nil, fmt.Errorf("store: open after retries: %w", lastErr)
+}
+
+func openOnce(ctx context.Context, abs string) (*Store, error) {
 	u := url.URL{Scheme: "file", Path: abs}
 	q := u.Query()
 	for _, pragma := range []string{
@@ -77,6 +98,11 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+func isBusyError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "locked") || strings.Contains(msg, "busy")
 }
 
 func (s *Store) Close() error { return s.db.Close() }
@@ -192,4 +218,11 @@ func (s *Store) SchemaVersion(ctx context.Context) (int, error) {
 // Queries wraps a DBTX so repositories can run on a connection or a transaction.
 type Queries struct {
 	q DBTX
+}
+
+func nonNilStrings(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
 }

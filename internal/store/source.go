@@ -12,7 +12,13 @@ import (
 )
 
 func (q *Queries) CreateSource(ctx context.Context, s *domain.Source) error {
-	fields, err := json.Marshal(s.FieldsAvailable)
+	if !s.Kind.Valid() {
+		return fmt.Errorf("store: invalid source kind %q", s.Kind)
+	}
+	if s.ExternalID == "" {
+		return fmt.Errorf("store: source external id is required")
+	}
+	fields, err := json.Marshal(nonNilStrings(s.FieldsAvailable))
 	if err != nil {
 		return fmt.Errorf("store: encode source fields: %w", err)
 	}
@@ -49,6 +55,7 @@ func (q *Queries) GetSource(ctx context.Context, id string) (*domain.Source, err
 	if err := json.Unmarshal([]byte(fields), &s.FieldsAvailable); err != nil {
 		return nil, fmt.Errorf("store: decode source fields: %w", err)
 	}
+	s.FieldsAvailable = nonNilStrings(s.FieldsAvailable)
 	if s.CreatedAt, err = parseTime(created); err != nil {
 		return nil, err
 	}
@@ -74,7 +81,7 @@ func (q *Queries) GetSourceByKindExternal(ctx context.Context, kind domain.Sourc
 }
 
 func (q *Queries) UpdateSourceFields(ctx context.Context, id string, fields []string, now time.Time) error {
-	data, err := json.Marshal(fields)
+	data, err := json.Marshal(nonNilStrings(fields))
 	if err != nil {
 		return err
 	}
