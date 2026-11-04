@@ -1,6 +1,6 @@
 # Task 0001 - Start Project
 
-State: todo
+State: canceled
 Owner: none
 Mode: mvp
 Lane: planning
@@ -50,3 +50,4 @@ Define the first useful implementation task.
 ## Notes
 
 - Keep the first task small.
+- cancel: Superseded by the foundation, vertical slice, notification and installation tasks 0002-0007; no separate planning task is needed.
