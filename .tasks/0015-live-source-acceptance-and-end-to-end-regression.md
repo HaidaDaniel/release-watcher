@@ -38,6 +38,7 @@ Run a polite live Narō smoke test against N2166FE and an isolated local end-to-
 - internal/config/**
 - docs/progress.md
 - docs/integration-contract.md
+- docs/deployment.md
 - README.md
 - .tasks/**
 
@@ -83,6 +84,7 @@ Run a polite live Narō smoke test against N2166FE and an isolated local end-to-
 
 - docs/progress.md
 - docs/integration-contract.md
+- docs/deployment.md
 - README.md
 
 ## Notes
