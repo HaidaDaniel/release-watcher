@@ -22,6 +22,13 @@ func TestInspectSchemaAndVacuumInto(t *testing.T) {
 	if err := st.Queries().SetSetting(ctx, "k", "v", time.Now()); err != nil {
 		t.Fatal(err)
 	}
+	liveInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if liveInfo.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("database permissions = %o", liveInfo.Mode().Perm())
+	}
 	version, err := store.InspectSchema(ctx, path)
 	if err != nil || version != 1 {
 		t.Fatalf("inspect live = %d err=%v", version, err)

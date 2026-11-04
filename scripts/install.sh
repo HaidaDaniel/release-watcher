@@ -33,8 +33,15 @@ fi
 
 unit_dir="$config_home/systemd/user"
 env_dir="$config_home/release-watcher"
+state_dir=${RELEASE_WATCHER_STATE_DIR:-$HOME/.local/share/release-watcher}
 install -Dm0755 "$binary" "$prefix/bin/release-watcher"
-install -Dm0644 "$repo/deploy/systemd/release-watcher.service" "$unit_dir/release-watcher.service"
+mkdir -p "$unit_dir"
+sed \
+  -e "s|%h/.local/bin/release-watcher|$prefix/bin/release-watcher|g" \
+  -e "s|%h/.config/release-watcher/env|$env_dir/env|g" \
+  -e "s|%h/.local/share/release-watcher|$state_dir|g" \
+  "$repo/deploy/systemd/release-watcher.service" > "$unit_dir/release-watcher.service"
+chmod 0644 "$unit_dir/release-watcher.service"
 install -Dm0644 "$repo/deploy/systemd/release-watcher.timer" "$unit_dir/release-watcher.timer"
 mkdir -p "$env_dir"
 chmod 700 "$env_dir"

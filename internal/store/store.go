@@ -103,7 +103,23 @@ func openOnce(ctx context.Context, abs string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := secureDatabaseFiles(abs); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return s, nil
+}
+
+func secureDatabaseFiles(path string) error {
+	if err := os.Chmod(path, 0o600); err != nil {
+		return fmt.Errorf("store: secure database file: %w", err)
+	}
+	for _, sidecar := range []string{path + "-wal", path + "-shm"} {
+		if _, err := os.Stat(sidecar); err == nil {
+			_ = os.Chmod(sidecar, 0o600)
+		}
+	}
+	return nil
 }
 
 func isRetryableOpenError(err error) bool {

@@ -187,6 +187,13 @@ func Restore(ctx context.Context, cfg config.Config, in string, force bool) (*Re
 	if dbEntry == nil {
 		return nil, newError("invalid_backup", "backup does not contain a database", nil)
 	}
+	if manifest.DatabaseBytes <= 0 {
+		return nil, newError("invalid_backup", "backup manifest has no valid database size", nil)
+	}
+	manifestHash, hashErr := hex.DecodeString(manifest.DatabaseSHA256)
+	if hashErr != nil || len(manifestHash) != sha256.Size {
+		return nil, newError("invalid_backup", "backup manifest has no valid database hash", nil)
+	}
 
 	stateDir := filepath.Dir(cfg.DBPath)
 	if err := os.MkdirAll(stateDir, 0o700); err != nil {
@@ -214,10 +221,10 @@ func Restore(ctx context.Context, cfg config.Config, in string, force bool) (*Re
 	if copyErr != nil || closeErr != nil {
 		return nil, newError("invalid_backup", "cannot extract backup database", firstError(copyErr, closeErr))
 	}
-	if manifest.DatabaseBytes != 0 && written != manifest.DatabaseBytes {
+	if written != manifest.DatabaseBytes {
 		return nil, newError("invalid_backup", "backup database size does not match the manifest", nil)
 	}
-	if manifest.DatabaseSHA256 != "" && hex.EncodeToString(hash.Sum(nil)) != manifest.DatabaseSHA256 {
+	if hex.EncodeToString(hash.Sum(nil)) != manifest.DatabaseSHA256 {
 		return nil, newError("invalid_backup", "backup database hash does not match the manifest", nil)
 	}
 	version, err := store.InspectSchema(ctx, tmpDB)
@@ -240,21 +247,29 @@ func Restore(ctx context.Context, cfg config.Config, in string, force bool) (*Re
 	if _, statErr := os.Stat(cfg.DBPath); statErr == nil {
 		hadExisting = true
 		_ = os.Remove(oldPath)
+		_ = os.Remove(oldPath + "-wal")
+		_ = os.Remove(oldPath + "-shm")
 		if err := os.Rename(cfg.DBPath, oldPath); err != nil {
 			return nil, newError("storage_error", "cannot move the current database aside", err)
 		}
+		moveIfExists(cfg.DBPath+"-wal", oldPath+"-wal")
+		moveIfExists(cfg.DBPath+"-shm", oldPath+"-shm")
 	}
 	_ = os.Remove(cfg.DBPath + "-wal")
 	_ = os.Remove(cfg.DBPath + "-shm")
 	if err := os.Rename(tmpDB, cfg.DBPath); err != nil {
 		if hadExisting {
 			_ = os.Rename(oldPath, cfg.DBPath)
+			moveIfExists(oldPath+"-wal", cfg.DBPath+"-wal")
+			moveIfExists(oldPath+"-shm", cfg.DBPath+"-shm")
 		}
 		return nil, newError("storage_error", "cannot install restored database", err)
 	}
 	_ = os.Remove(cfg.DBPath + "-wal")
 	_ = os.Remove(cfg.DBPath + "-shm")
 	if hadExisting {
+		_ = os.Remove(oldPath + "-wal")
+		_ = os.Remove(oldPath + "-shm")
 		_ = os.Remove(oldPath)
 	}
 	return &RestoreResult{Path: cfg.DBPath, SchemaVersion: version, Bytes: written}, nil
@@ -267,4 +282,10 @@ func firstError(errors ...error) error {
 		}
 	}
 	return nil
+}
+
+func moveIfExists(src, dst string) {
+	if _, err := os.Stat(src); err == nil {
+		_ = os.Rename(src, dst)
+	}
 }

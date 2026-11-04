@@ -77,3 +77,44 @@ func TestSystemdUnitsAndInstallScript(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallScriptRendersCustomPaths(t *testing.T) {
+	root := repoRoot(t)
+	tmp := t.TempDir()
+	prefix := filepath.Join(tmp, "prefix")
+	configHome := filepath.Join(tmp, "config")
+	stateDir := filepath.Join(tmp, "state")
+	fakeBin := filepath.Join(tmp, "fake-release-watcher")
+	if err := os.WriteFile(fakeBin, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("bash", filepath.Join(root, "scripts", "install.sh"), fakeBin)
+	cmd.Env = append(os.Environ(),
+		"HOME="+tmp,
+		"PREFIX="+prefix,
+		"XDG_CONFIG_HOME="+configHome,
+		"RELEASE_WATCHER_STATE_DIR="+stateDir,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("install script: %v\n%s", err, output)
+	}
+	service, err := os.ReadFile(filepath.Join(configHome, "systemd", "user", "release-watcher.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"ExecStart=" + filepath.Join(prefix, "bin", "release-watcher") + " scan --due --json",
+		"EnvironmentFile=-" + filepath.Join(configHome, "release-watcher", "env"),
+		"Environment=RELEASE_WATCHER_STATE_DIR=" + stateDir,
+	} {
+		if !strings.Contains(string(service), want) {
+			t.Fatalf("rendered service missing %q:\n%s", want, service)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(prefix, "bin", "release-watcher")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(configHome, "release-watcher", "env")); err != nil {
+		t.Fatal(err)
+	}
+}

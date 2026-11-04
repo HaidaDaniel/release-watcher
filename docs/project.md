@@ -42,13 +42,13 @@ release-watcher scan --due
 | Repository docs, non-goals, ADRs | implemented |
 | Go module, CLI bootstrap, build identity | implemented |
 | Lefthook fast/push checks, build scripts | implemented |
-| SQLite domain storage and migrations | planned |
-| Narō adapter and baseline detection | planned |
-| RSS/Atom adapter | planned |
-| `add`, `list`, `show`, `scan`, `events`, pause/resume/interval/remove | planned |
+| SQLite domain storage and migrations | implemented |
+| Narō adapter and baseline detection | implemented |
+| RSS/Atom adapter | implemented |
+| `add`, `list`, `show`, `scan`, `events`, pause/resume/interval/remove | implemented |
 | Telegram outbox, retries and RU/EN messages | implemented |
 | Doctor (foundation config/environment checks) | implemented |
-| Backup/restore | planned |
+| Backup/restore and atomic restore validation | implemented |
 | systemd units and user install script | implemented (static/local proof) |
 | Whoosh Core deployment spike | assessed, not executed |
 | Media Core documentation | separate repository |

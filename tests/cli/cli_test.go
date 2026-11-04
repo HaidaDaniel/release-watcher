@@ -3,6 +3,7 @@ package cli_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -424,5 +425,51 @@ func TestCLIBackupRestoreAndDoctor(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("doctor schema check missing: %s", stdout)
+	}
+}
+
+func TestCLIDoctorReportsNewerSchemaWithoutMigrating(t *testing.T) {
+	env := testEnv(t)
+	dbPath := env["RELEASE_WATCHER_DB"]
+	db, err := sql.Open("sqlite", "file:"+dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (999, '2026-01-01T00:00:00Z')`); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+
+	code, stdout, _ := runCLI(t, env, "doctor", "--json")
+	if code != cli.ExitError {
+		t.Fatalf("doctor exit = %d", code)
+	}
+	checks := dataMap(t, decodeEnvelope(t, stdout))["checks"].([]any)
+	found := false
+	for _, raw := range checks {
+		check := raw.(map[string]any)
+		if check["id"] == "schema" && check["status"] == "error" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("doctor did not report newer schema: %s", stdout)
+	}
+	// Doctor must not migrate or alter the injected version.
+	version, err := func() (int, error) {
+		db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
+		if err != nil {
+			return 0, err
+		}
+		defer db.Close()
+		var v int
+		err = db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&v)
+		return v, err
+	}()
+	if err != nil || version != 999 {
+		t.Fatalf("schema changed by doctor: version=%d err=%v", version, err)
 	}
 }

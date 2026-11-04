@@ -6,7 +6,7 @@ Status: local installation and recovery are implemented and statically verified;
 
 - One statically linked (or pure-Go) binary: `release-watcher`.
 - One state directory outside the source tree, defaulting to `$XDG_DATA_HOME/release-watcher` (normally `~/.local/share/release-watcher`) or `RELEASE_WATCHER_STATE_DIR`.
-- SQLite database in that directory, created `0600` by the process.
+- SQLite database in that directory, secured to `0600` by the process; SQLite sidecars live in the same private directory.
 - A user-level systemd service (oneshot) and timer. No root daemon, no Docker, no PostgreSQL, no Redis.
 
 ## Build

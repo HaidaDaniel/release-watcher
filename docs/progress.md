@@ -4,7 +4,6 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Planned
 
-- Scan comparison, application use cases and CLI JSON (task 0005).
 - Media Core documentation in its own repository.
 - Whoosh Core deployment spike and first controlled deployment after MVP.
 - Backlog sources and MCP stdio.
@@ -53,4 +52,4 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Next step
 
-Task 0007: backup/restore, full doctor, systemd installation and Whoosh assessment.
+MVP acceptance on a real host, a polite live Narō smoke test, the Whoosh deployment spike, and Media Core documentation remain. See docs/roadmap.md and tasks 0008–0009.

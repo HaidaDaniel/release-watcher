@@ -6,11 +6,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/HaidaDaniel/release-watcher/internal/app"
+	"github.com/HaidaDaniel/release-watcher/internal/lock"
 )
 
 func TestBackupRestoreRoundTrip(t *testing.T) {
@@ -124,11 +126,15 @@ func TestRestoreRejectsNewerSchema(t *testing.T) {
 
 func writeBackupArchive(t *testing.T, path string, dbData []byte, schema int) {
 	t.Helper()
-	manifest := map[string]any{
+	writeBackupArchiveWithManifest(t, path, map[string]any{
 		"format": "release-watcher-backup", "format_version": 1,
 		"schema_version": schema, "app_version": "test",
 		"database_sha256": sha256Hex(dbData), "database_bytes": len(dbData),
-	}
+	}, dbData)
+}
+
+func writeBackupArchiveWithManifest(t *testing.T, path string, manifest map[string]any, dbData []byte) {
+	t.Helper()
 	raw, _ := json.Marshal(manifest)
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -140,4 +146,93 @@ func writeBackupArchive(t *testing.T, path string, dbData []byte, schema int) {
 	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func readBackupDB(t *testing.T, path string) []byte {
+	t.Helper()
+	zr, err := zip.OpenReader(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		if f.Name != "release-watcher.db" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rc.Close()
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	t.Fatal("database entry not found")
+	return nil
+}
+
+func TestRestoreRejectsMissingHashAndSize(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	_ = addNaro(t, env, nil)
+	valid := filepath.Join(t.TempDir(), "valid.rwbackup")
+	if _, appErr := env.svc.Backup(ctx, valid, false); appErr != nil {
+		t.Fatal(appErr)
+	}
+	dbData := readBackupDB(t, valid)
+	for name, manifest := range map[string]map[string]any{
+		"missing-hash": {
+			"format": "release-watcher-backup", "format_version": 1,
+			"schema_version": 1, "database_bytes": len(dbData),
+		},
+		"missing-size": {
+			"format": "release-watcher-backup", "format_version": 1,
+			"schema_version": 1, "database_sha256": sha256Hex(dbData),
+		},
+		"zero-size": {
+			"format": "release-watcher-backup", "format_version": 1,
+			"schema_version": 1, "database_sha256": sha256Hex(dbData), "database_bytes": 0,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), name+".rwbackup")
+			writeBackupArchiveWithManifest(t, path, manifest, dbData)
+			if _, appErr := app.Restore(ctx, env.cfg, path, true); appErr == nil || appErr.Code != "invalid_backup" {
+				t.Fatalf("restore = %+v", appErr)
+			}
+		})
+	}
+}
+
+func TestBackupPermissionsAndLock(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	_ = addNaro(t, env, nil)
+	path := filepath.Join(t.TempDir(), "state.rwbackup")
+	if _, appErr := env.svc.Backup(ctx, path, false); appErr != nil {
+		t.Fatal(appErr)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("backup permissions = %o", info.Mode().Perm())
+	}
+	release, err := lock.Acquire(ctx, env.cfg.LockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, appErr := env.svc.Backup(ctx, filepath.Join(t.TempDir(), "locked.rwbackup"), false); appErr == nil || appErr.Code != "locked" {
+		t.Fatalf("backup with held lock = %+v", appErr)
+	}
+	if _, appErr := app.Restore(ctx, env.cfg, path, true); appErr == nil || appErr.Code != "locked" {
+		t.Fatalf("restore with held lock = %+v", appErr)
+	}
+	release()
 }
