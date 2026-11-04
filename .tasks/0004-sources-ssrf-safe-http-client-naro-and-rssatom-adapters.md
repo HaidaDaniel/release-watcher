@@ -1,6 +1,6 @@
 # Task 0004 - Sources: SSRF-safe HTTP client, Naro and RSS/Atom adapters
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
