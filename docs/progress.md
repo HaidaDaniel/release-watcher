@@ -5,7 +5,6 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 ## Planned
 
 - Scan comparison, application use cases and CLI JSON (task 0005).
-- Backup/restore, full read-only doctor, systemd installation and Whoosh assessment (task 0007).
 - Media Core documentation in its own repository.
 - Whoosh Core deployment spike and first controlled deployment after MVP.
 - Backlog sources and MCP stdio.
@@ -28,6 +27,10 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Process-level scan lock and per-watch timeout/error isolation.
 - Durable Telegram outbox with pending/sent/failed states, bounded retry/backoff, permanent-failure handling and dedupe.
 - Grouped RU/EN event messages and `notify` command; events remain stored when Telegram is absent or failing.
+- Single-file backup archive with manifest/hash and validated atomic restore.
+- Read-only, schema-aware doctor without implicit migration.
+- User-level install script and systemd service/timer installation path.
+- Linux amd64 and arm64 builds; static systemd verification and local binary smoke checks.
 
 ## Tested
 
@@ -41,13 +44,12 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Deployed
 
-- Not deployed. No production deployment claim exists yet.
+- Not deployed to a production host. Linux binaries were built locally, the amd64 binary was smoke-checked, and systemd units were statically verified.
 
 ## Blocked
 
-- Whoosh Core live deployment: no test host and no MVP candidate yet. Planned after task 0007.
-- Fixture-based adapter and detection tests plus a single polite live Narō smoke test: blocked until the adapter tasks implement them.
-- Real Narō behavior is not yet verified; no live smoke test has been run.
+- Whoosh Core live deployment: no test host; assessment documented but not executed. Separate backlog task.
+- A live Narō smoke test has not been run; adapters use fixtures and local test servers.
 
 ## Next step
 

@@ -114,6 +114,10 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return r.events(ctx, commandArgs)
 	case "notify":
 		return r.notify(ctx, commandArgs)
+	case "backup":
+		return r.backup(ctx, commandArgs)
+	case "restore":
+		return r.restore(ctx, commandArgs)
 	case "pause":
 		return r.pause(ctx, commandArgs)
 	case "resume":
@@ -311,8 +315,27 @@ func (r *runner) doctor(ctx context.Context, args []string) int {
 		add("state_dir", "error", "cannot inspect state directory")
 	}
 
-	if _, statErr := os.Stat(cfg.DBPath); statErr == nil {
+	if info, statErr := os.Stat(cfg.DBPath); statErr == nil {
 		add("storage", "ok", "database file exists")
+		if info.Mode().Perm()&0o077 != 0 {
+			add("database_permissions", "warn", "database is accessible by group/others; prefer 0600")
+		} else {
+			add("database_permissions", "ok", "database permissions are private")
+		}
+		version, inspectErr := store.InspectSchema(ctx, cfg.DBPath)
+		known, knownErr := store.KnownSchemaVersion()
+		switch {
+		case inspectErr != nil:
+			add("schema", "error", "cannot read database schema: "+inspectErr.Error())
+		case knownErr != nil:
+			add("schema", "error", "cannot read known schema version")
+		case version == 0:
+			add("schema", "warn", "database has no recognizable schema")
+		case version > known:
+			add("schema", "error", "database schema is newer than this binary")
+		default:
+			add("schema", "ok", "schema version "+strconv.Itoa(version))
+		}
 	} else if os.IsNotExist(statErr) {
 		add("storage", "warn", "database has not been initialized yet")
 	} else {
@@ -323,6 +346,11 @@ func (r *runner) doctor(ctx context.Context, args []string) int {
 		add("telegram", "ok", "Telegram is configured (no network request was made)")
 	} else {
 		add("telegram", "warn", "Telegram is not configured; events remain available through the CLI")
+	}
+	if cfg.AllowPrivateHosts {
+		add("ssrf", "warn", "private hosts are allowed; this is intended for tests/local development only")
+	} else {
+		add("ssrf", "ok", "SSRF protection is enabled")
 	}
 
 	info := buildinfo.Get()
@@ -468,6 +496,8 @@ const helpRU = `Release Watcher — отслеживание новых публ
   scan [--due|--all|--id]   проверить источники
   events                    прочитать события
   notify                    отправить ожидающие уведомления
+  backup --out <file>       создать резервную копию
+  restore --in <file>       восстановить из резервной копии
   pause <id>                приостановить наблюдение
   resume <id>               возобновить наблюдение
   interval <id> <dur>       изменить интервал наблюдения
@@ -498,6 +528,8 @@ Commands:
   scan [--due|--all|--id]   check sources
   events                    read events
   notify                    flush pending notifications
+  backup --out <file>       create a backup archive
+  restore --in <file>       restore from a backup archive
   pause <id>                pause a watch
   resume <id>               resume a watch
   interval <id> <dur>       change a watch interval

@@ -38,14 +38,14 @@ Exit: add `https://ncode.syosetu.com/n2166fe/`, baseline without a false notific
 
 Exit: a failed Telegram request is retried and a successful event produces exactly one message.
 
-## Stage 4 — Multiple sources and operations (task 0007)
+## Stage 4 — Multiple sources and operations (task 0007) — local evidence done
 
 - Multiple watches, per-watch intervals, source isolation.
 - Backup/restore, readable event export, doctor.
 - systemd timer installation and docs; build linux/amd64 and linux/arm64.
 - Whoosh Core assessment and deployment spike plan/backlog.
 
-Exit: MVP acceptance scenario is executed on a Linux host; backup restore and restart are verified. First Whoosh deployment is recorded separately only after it actually happens.
+Exit: backup/restore, doctor, local binary smoke and static systemd verification are done. A live-schema acceptance run on a host, the polite Narō smoke and the first Whoosh deployment remain separate tasks and are not claimed.
 
 ## Stage 5 — Media Core documentation (separate repository)
 

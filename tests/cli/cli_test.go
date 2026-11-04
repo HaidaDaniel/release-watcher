@@ -364,3 +364,65 @@ func TestCLINotifyRequiresConfiguration(t *testing.T) {
 		t.Fatalf("error = %s", stdout)
 	}
 }
+
+func TestCLIBackupRestoreAndDoctor(t *testing.T) {
+	feed := newFeedServer(t, "A")
+	env := testEnv(t)
+	code, stdout, _ := runCLI(t, env, "add", feed.server.URL+"/feed.xml", "--json")
+	if code != 0 {
+		t.Fatalf("add = %s", stdout)
+	}
+	watchID := dataMap(t, decodeEnvelope(t, stdout))["watch_id"].(string)
+
+	backupPath := filepath.Join(t.TempDir(), "state.rwbackup")
+	code, stdout, _ = runCLI(t, env, "backup", "--out", backupPath, "--json")
+	if code != 0 {
+		t.Fatalf("backup = %s", stdout)
+	}
+	if dataMap(t, decodeEnvelope(t, stdout))["schema_version"] != float64(1) {
+		t.Fatalf("backup data = %s", stdout)
+	}
+
+	feed.set("A", "B")
+	code, stdout, _ = runCLI(t, env, "scan", "--id", watchID, "--json")
+	if code != 0 {
+		t.Fatalf("scan = %s", stdout)
+	}
+	code, stdout, _ = runCLI(t, env, "events", "--json")
+	if len(dataMap(t, decodeEnvelope(t, stdout))["events"].([]any)) != 1 {
+		t.Fatalf("events before restore = %s", stdout)
+	}
+
+	code, stdout, _ = runCLI(t, env, "restore", "--in", backupPath, "--json")
+	if code != cli.ExitError {
+		t.Fatalf("restore without force exit = %d", code)
+	}
+	if decodeEnvelope(t, stdout)["error"].(map[string]any)["code"] != "already_exists" {
+		t.Fatalf("restore error = %s", stdout)
+	}
+
+	code, stdout, _ = runCLI(t, env, "restore", "--in", backupPath, "--force", "--json")
+	if code != 0 {
+		t.Fatalf("restore = %s", stdout)
+	}
+	code, stdout, _ = runCLI(t, env, "events", "--json")
+	if len(dataMap(t, decodeEnvelope(t, stdout))["events"].([]any)) != 0 {
+		t.Fatalf("events after restore = %s", stdout)
+	}
+
+	code, stdout, _ = runCLI(t, env, "doctor", "--json")
+	if code != 0 {
+		t.Fatalf("doctor = %s", stdout)
+	}
+	checks := dataMap(t, decodeEnvelope(t, stdout))["checks"].([]any)
+	found := false
+	for _, raw := range checks {
+		check := raw.(map[string]any)
+		if check["id"] == "schema" && check["status"] == "ok" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("doctor schema check missing: %s", stdout)
+	}
+}

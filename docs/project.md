@@ -1,6 +1,6 @@
 # Release Watcher
 
-Status: MVP vertical slice plus notifications. The repository foundation, SQLite persistence, Narō/RSS/Atom adapters, scan detection, CLI vertical slice and the optional durable Telegram outbox are implemented. Backup/restore, installation proof and the Whoosh deployment spike are still planned; this document separates those states explicitly.
+Status: MVP vertical slice plus notifications and local installation. The repository foundation, SQLite persistence, Narō/RSS/Atom adapters, scan detection, CLI vertical slice, optional durable Telegram outbox, backup/restore, read-only doctor, user systemd units and Linux builds are implemented. A live deployment and the Whoosh spike remain planned; this document separates those states explicitly.
 
 ## Mission
 
@@ -49,8 +49,8 @@ release-watcher scan --due
 | Telegram outbox, retries and RU/EN messages | implemented |
 | Doctor (foundation config/environment checks) | implemented |
 | Backup/restore | planned |
-| systemd timer installation proof | planned |
-| Whoosh Core deployment spike | planned, not executed |
+| systemd units and user install script | implemented (static/local proof) |
+| Whoosh Core deployment spike | assessed, not executed |
 | Media Core documentation | separate repository |
 
 ## Boundary

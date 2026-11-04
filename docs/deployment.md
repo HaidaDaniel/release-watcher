@@ -1,6 +1,6 @@
 # Deployment
 
-Status: documented target, not deployed. The MVP installation proof and the Whoosh Core spike happen in task 0007. Nothing in this document claims a live deployment.
+Status: local installation and recovery are implemented and statically verified; no live production deployment has been performed. The Whoosh Core deployment spike remains a separate backlog task. Nothing in this document claims a live deployment.
 
 ## Runtime shape
 
@@ -22,12 +22,16 @@ The script uses `CGO_ENABLED=0`, `-trimpath`, and injects version, commit, build
 ## Install without root
 
 ```sh
-install -Dm0755 bin/release-watcher-linux-amd64 ~/.local/bin/release-watcher
-install -Dm0644 deploy/systemd/release-watcher.service ~/.config/systemd/user/release-watcher.service
-install -Dm0644 deploy/systemd/release-watcher.timer ~/.config/systemd/user/release-watcher.timer
-systemctl --user daemon-reload
-systemctl --user enable --now release-watcher.timer
+scripts/build.sh --all
+scripts/install.sh --enable
+release-watcher doctor --json
 systemctl --user list-timers release-watcher.timer
+```
+
+`scripts/install.sh` installs the binary to `~/.local/bin`, the user service/timer to `$XDG_CONFIG_HOME/systemd/user` (normally `~/.config/systemd/user`), creates a private `~/.config/release-watcher/env` template, reloads the user manager and optionally enables the timer. Set `PREFIX` to install elsewhere. Without `--enable`, enable it manually:
+
+```sh
+systemctl --user enable --now release-watcher.timer
 ```
 
 The timer runs hourly with `Persistent=true`, so a missed run is recovered. `scan --due` is a cheap no-op when no watch is due. The default interval is 24h; if a watch uses a shorter interval, the timer must run at least that often. Change `OnCalendar` in the timer unit and reload it:
@@ -64,32 +68,63 @@ Secrets are never logged and never stored in SQLite.
 
 ## Backup and restore
 
-The binary provides `backup` and `restore` (task 0007). The backup is a single readable archive containing a manifest and a consistent SQLite copy. Restore requires the CLI to be the only process using the database and validates the archive before replacing live state. Run a backup before every upgrade.
+The binary provides a single-file, readable backup archive containing a manifest (format version, schema version, app version, size, SHA-256) and a consistent `VACUUM INTO` SQLite copy.
+
+```sh
+release-watcher backup --out /var/backups/release-watcher.rwbackup
+# before upgrading or restoring, stop the timer and other commands
+systemctl --user stop release-watcher.timer
+release-watcher restore --in /var/backups/release-watcher.rwbackup --force
+systemctl --user start release-watcher.timer
+```
+
+Restore acquires the same process lock as scans/notify, validates the archive, size and hash, inspects the schema read-only, and refuses a schema newer than the binary. Replacement is staged in the database directory and the previous database is kept aside until the new file is in place. `--force` is required when a database already exists. Run a backup before every upgrade.
+
+## Doctor
+
+`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings and build identity. It does not create or migrate the database.
+
+## Local verification evidence
+
+The installation task verified:
+
+- `scripts/build.sh --all` produced linux/amd64 and linux/arm64 binaries; `file` reports a statically linked ARM64 ELF.
+- The amd64 binary reports honest build identity with `version --json` and doctor parses configuration without a database.
+- `systemd-analyze verify` accepted the service and timer with a temporary executable path.
+- The install script and build script pass `bash -n`.
+- Backup/restore and doctor are covered by tests at application and CLI levels.
+
+This is local evidence, not a claim that a production host was deployed or that ARM64 was executed on hardware.
 
 ## Upgrade and rollback
 
 1. Run `release-watcher backup --out <file>`.
-2. Install the new binary over the old path.
-3. Run `release-watcher doctor` and `release-watcher scan --due`.
-4. If migrations or behavior fail, stop the timer, restore the backup with the previous binary, then re-enable the timer.
+2. Stop the timer: `systemctl --user stop release-watcher.timer`.
+3. Install the new binary over the old path.
+4. Run `release-watcher doctor` and `release-watcher scan --due`.
+5. If migrations or behavior fail, restore the backup with the previous binary, then re-enable the timer.
 
-## Whoosh Core assessment (not executed)
+A database whose schema is newer than the binary is reported by doctor and by the store's migration guard; it is not downgraded in place.
 
-Whoosh Core is a single-binary SSH deployment tool that builds timestamped releases, links shared paths, atomically swaps a `current` symlink and supports rollback. It can run in a local mode and via SSH, and supports staged tasks/hooks. That matches most of the desired deployment shape:
+## Whoosh Core assessment (documented, not executed)
 
-- deliver a prebuilt binary to Linux x86-64/ARM64 targets;
-- keep the SQLite state in a shared directory outside release directories;
-- run backup/migration/smoke/restart tasks through hooks;
-- atomically switch `current` and roll back.
+Whoosh Core is a single-binary SSH deployment tool. From its README it builds timestamped releases from Git, links shared files/directories, atomically swaps a `current` symlink, keeps a bounded number of releases, supports rollback, and runs per-stage tasks/hooks. It also supports a local execution mode and per-stage host inventories.
 
-Open questions for the spike:
+Mapping to Release Watcher:
 
-- whether Whoosh can publish a **prebuilt local artifact** without making the target build from Git (the README documents Git-based releases and a local mode; the exact prebuilt-artifact path must be verified);
-- how SQLite backup runs before a migration hook and how a failed smoke test rolls back;
-- service restart ordering for a oneshot scan timer;
-- repeatable verification on ARM64 and a second deploy with existing state.
+| Requirement | Whoosh capability | Spike question |
+| --- | --- | --- |
+| Prebuilt Go binary over SSH | Git-based release build; local mode; task commands | Is there a first-class prebuilt-artifact upload, or must a task copy the binary into a release? Verify before relying on it. |
+| Linux x86-64 / ARM64 | Whoosh is a Go binary and is arch-independent for transport | Build and deploy both artifacts; execute only on matching hosts. |
+| Versioned releases | Timestamped release directories, `keep_releases` | Confirm retention leaves enough rollback targets. |
+| Atomic `current` | Symlink swap | Confirm the service uses the `current` path and restarts after the swap. |
+| systemd timer/service | Task/hook commands | Non-login SSH may lack a user system bus; verify `systemctl --user` on the target or use a system unit. |
+| SQLite outside releases | `linked_dirs` from `shared/` | Point `RELEASE_WATCHER_STATE_DIR` at a shared data directory; never at a release directory. |
+| Backup before migration | `before` hook/task | Run `release-watcher backup` and verify the artifact before the new binary starts. |
+| Smoke after install | `after` hook/task | Run `doctor`, `version`, and a `scan --due`; fail the deploy on a non-zero result. |
+| Rollback | `deploy:rollback` | Verify old release + restored/pre-upgrade SQLite backup. |
 
-The spike is a separate backlog task after MVP acceptance. No Whoosh config is treated as verified until it runs on a test host. Whoosh is not a runtime dependency and no third deployment-framework repository is created.
+The spike is a separate backlog task. It must record the exact Whoosh version/commit, a test host, a prebuilt-artifact path, the SQLite shared path, timer delivery, a successful repeat deploy and a rollback, plus ARM64 evidence. Until then this table is an assessment, not a verified deployment. Whoosh is not a runtime dependency and no third deployment-framework repository is created.
 
 ## Security
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/HaidaDaniel/release-watcher/internal/app"
+	"github.com/HaidaDaniel/release-watcher/internal/config"
 	"github.com/HaidaDaniel/release-watcher/internal/domain"
 )
 
@@ -362,4 +363,65 @@ func optionalString(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+func (r *runner) backup(ctx context.Context, args []string) int {
+	values, positionals, err := parseCommandArgs(args, map[string]flagKind{
+		"out":   valueFlag,
+		"force": boolFlag,
+	})
+	if err != nil {
+		return r.fail(err)
+	}
+	if len(positionals) != 0 || values["out"] == "" {
+		return r.fail(&commandError{code: "usage", message: "usage: release-watcher backup --out <file> [--force]", exit: ExitUsage})
+	}
+	svc, closeStore, openErr := r.openService(ctx)
+	if openErr != nil {
+		return r.fail(openErr)
+	}
+	defer closeStore()
+	result, appErr := svc.Backup(ctx, values["out"], flagBool(values, "force"))
+	if appErr != nil {
+		return r.failApp(appErr)
+	}
+	if r.json {
+		r.writeJSON(envelope{SchemaVersion: SchemaVersion, OK: true, Data: result})
+		return ExitOK
+	}
+	fmt.Fprintf(r.stdout, "%s: %s\n%s: %d\n%s: %d\n",
+		r.t("Резервная копия", "Backup"), result.Path,
+		r.t("Версия схемы", "Schema version"), result.SchemaVersion,
+		r.t("Байт", "Bytes"), result.Bytes)
+	return ExitOK
+}
+
+func (r *runner) restore(ctx context.Context, args []string) int {
+	values, positionals, err := parseCommandArgs(args, map[string]flagKind{
+		"in":    valueFlag,
+		"force": boolFlag,
+	})
+	if err != nil {
+		return r.fail(err)
+	}
+	if len(positionals) != 0 || values["in"] == "" {
+		return r.fail(&commandError{code: "usage", message: "usage: release-watcher restore --in <file> --force", exit: ExitUsage})
+	}
+	cfg, cfgErr := config.Load(r.getenv)
+	if cfgErr != nil {
+		return r.fail(&commandError{code: "config_error", message: cfgErr.Error(), exit: ExitError})
+	}
+	result, appErr := app.Restore(ctx, cfg, values["in"], flagBool(values, "force"))
+	if appErr != nil {
+		return r.failApp(appErr)
+	}
+	if r.json {
+		r.writeJSON(envelope{SchemaVersion: SchemaVersion, OK: true, Data: result})
+		return ExitOK
+	}
+	fmt.Fprintf(r.stdout, "%s: %s\n%s: %d\n%s: %d\n",
+		r.t("Восстановлено", "Restored"), result.Path,
+		r.t("Версия схемы", "Schema version"), result.SchemaVersion,
+		r.t("Байт", "Bytes"), result.Bytes)
+	return ExitOK
 }

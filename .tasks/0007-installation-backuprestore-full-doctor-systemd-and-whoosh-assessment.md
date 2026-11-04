@@ -1,7 +1,7 @@
 # Task 0007 - Installation: backup/restore, full doctor, systemd and Whoosh assessment
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Scope: operations,backup,doctor,systemd,deployment,docs
@@ -37,6 +37,7 @@ Make the MVP installable and recoverable on Linux: consistent SQLite backup/rest
 - tests/install/**
 - docs/**
 - README.md
+- .tasks/**
 
 ## Files forbidden to edit
 

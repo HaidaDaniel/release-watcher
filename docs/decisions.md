@@ -102,3 +102,10 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Status: Accepted and implemented by corrective review of task 0005
 - Decision: A repeated `add` resolves the existing publication/watch from local state before any network fetch, so it remains idempotent when the source is down. It returns `created: false` and `reason: already_exists`. Scan changes and events are committed atomically; a replay with no new state emits nothing. The event dedupe key preserves transition order (for example `ongoing → completed` differs from `completed → ongoing`) and includes the detection time, so a later legitimate recurrence is not suppressed. Release-set parts are sorted for stability.
 - Consequences: "Dedupe" does not mean an event can never recur; it means the same committed transition is not inserted twice. Consumers deduplicate by the stable `event_id`. `show` reads the newest events while the `events` command stays ascending for cursor paging. Add collapses duplicate source entry ids before creating baseline rows, so a malformed feed cannot fail the first add with a unique-constraint error.
+
+## ADR-0015 — Backup is a verified single-file archive; restore is validated and exclusive
+
+- Date: 2026-11-04
+- Status: Accepted and implemented by task 0007
+- Decision: `backup` runs `VACUUM INTO` for a consistent SQLite copy and writes one ZIP archive with a manifest (format version, schema version, app version, size, SHA-256). The live store is not copied by file-copy while WAL is active. `restore` acquires the same process lock as scans/notify, validates archive structure, size, hash and schema read-only, refuses a schema newer than the binary, and replaces the database through a staged rename with the previous file kept aside until success. It requires `--force` when a database exists.
+- Consequences: Backup/restore are ordinary CLI operations and usable without a server. They do not protect against a caller that ignores the lock and opens the database directly; installation docs require stopping the timer and other commands before restore. `doctor` is read-only and reports the schema version without migrating.

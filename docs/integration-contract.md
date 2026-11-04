@@ -296,7 +296,8 @@ Messages are grouped per event (a multi-chapter event becomes one message), use 
 ## `doctor`, `backup`, `restore`
 
 - `doctor --json` is implemented as a read-only configuration/environment check and returns `{"healthy":true|false,"checks":[{"id":"...","status":"ok|warn|error","message":"..."}]}`. It does not migrate. A deeper schema/permission probe is part of the installation task.
-- `backup` and `restore` are planned for the installation task; they are not implemented in the current candidate. Their planned shapes are `{"path":"...","schema_version":...,"bytes":N,"created_at":"..."}` and the restored schema version with an exclusivity warning.
+- `backup --out <path> [--force] --json` returns `{"path":"...","schema_version":N,"bytes":N,"created_at":"..."}`. The archive contains `manifest.json` (format, schema, app version, SHA-256, size) and `release-watcher.db`.
+- `restore --in <path> --force --json` validates format, size, hash and schema compatibility, acquires the scan/notify lock and replaces the database. It returns `{"path":"...","schema_version":N,"bytes":N}`. It refuses a newer schema and requires `--force` when a database exists.
 
 ## Media Core import
 
