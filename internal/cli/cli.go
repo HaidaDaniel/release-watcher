@@ -16,6 +16,7 @@ import (
 	"github.com/HaidaDaniel/release-watcher/internal/config"
 	"github.com/HaidaDaniel/release-watcher/internal/i18n"
 	"github.com/HaidaDaniel/release-watcher/internal/logging"
+	"github.com/HaidaDaniel/release-watcher/internal/notifier"
 	"github.com/HaidaDaniel/release-watcher/internal/source"
 	"github.com/HaidaDaniel/release-watcher/internal/source/httpx"
 	"github.com/HaidaDaniel/release-watcher/internal/store"
@@ -111,6 +112,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return r.scan(ctx, commandArgs)
 	case "events":
 		return r.events(ctx, commandArgs)
+	case "notify":
+		return r.notify(ctx, commandArgs)
 	case "pause":
 		return r.pause(ctx, commandArgs)
 	case "resume":
@@ -251,6 +254,9 @@ func (r *runner) openService(ctx context.Context) (*app.Service, func(), *comman
 	})
 	reg := source.NewRegistry(client)
 	svc := app.New(cfg, st, reg, logger)
+	if cfg.TelegramEnabled() {
+		svc.SetNotifier(notifier.NewTelegram(cfg.TelegramAPIBase, cfg.TelegramToken, cfg.TelegramChatID, cfg.HTTPTimeout))
+	}
 	return svc, func() { _ = st.Close() }, nil
 }
 
@@ -461,6 +467,7 @@ const helpRU = `Release Watcher — отслеживание новых публ
   show <id>                 показать наблюдение, релизы и события
   scan [--due|--all|--id]   проверить источники
   events                    прочитать события
+  notify                    отправить ожидающие уведомления
   pause <id>                приостановить наблюдение
   resume <id>               возобновить наблюдение
   interval <id> <dur>       изменить интервал наблюдения
@@ -490,6 +497,7 @@ Commands:
   show <id>                 show a watch, releases and events
   scan [--due|--all|--id]   check sources
   events                    read events
+  notify                    flush pending notifications
   pause <id>                pause a watch
   resume <id>               resume a watch
   interval <id> <dur>       change a watch interval

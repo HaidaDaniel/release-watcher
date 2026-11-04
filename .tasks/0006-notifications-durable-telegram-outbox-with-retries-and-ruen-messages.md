@@ -1,7 +1,7 @@
 # Task 0006 - Notifications: durable Telegram outbox with retries and RU/EN messages
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Scope: notifications,telegram,outbox,cli,docs
@@ -17,6 +17,7 @@ Add an optional Telegram notifier and a durable SQLite outbox. New events enqueu
 ## Context files
 
 - AGENTS.md
+- README.md
 - docs/architecture.md
 - docs/domain-model.md
 - docs/integration-contract.md
@@ -32,6 +33,7 @@ Add an optional Telegram notifier and a durable SQLite outbox. New events enqueu
 - internal/config/**
 - tests/app/**
 - tests/cli/**
+- README.md
 - docs/architecture.md
 - docs/domain-model.md
 - docs/integration-contract.md

@@ -5,7 +5,6 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 ## Planned
 
 - Scan comparison, application use cases and CLI JSON (task 0005).
-- Telegram outbox and RU/EN notifications (task 0006).
 - Backup/restore, full read-only doctor, systemd installation and Whoosh assessment (task 0007).
 - Media Core documentation in its own repository.
 - Whoosh Core deployment spike and first controlled deployment after MVP.
@@ -27,6 +26,8 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Scan comparison with silent baselines, catalog add/update/remove, count-only change events, metadata/status events and event dedupe.
 - CLI commands `add`, `list`, `show`, `scan`, `events`, `pause`, `resume`, `interval`, `remove` with stable JSON, RU/EN human output and exit codes.
 - Process-level scan lock and per-watch timeout/error isolation.
+- Durable Telegram outbox with pending/sent/failed states, bounded retry/backoff, permanent-failure handling and dedupe.
+- Grouped RU/EN event messages and `notify` command; events remain stored when Telegram is absent or failing.
 
 ## Tested
 
@@ -35,6 +36,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - `scripts/verify-push.sh` runs gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...` and APK lint.
 - Source tests: SSRF address policy (including exotic IPv6) and dial-time blocking, retry, pacing, header/body timeout, cancellation, redirect/body limits, status mapping, Narō catalog/pagination/partial/count-only/status-unknown/undercount/missing-update-block/empty-first-page/404-page-boundary, RSS 2.0/RSS 1.0/Atom parsing, relative links, fallback-id collisions and kind mismatch: see task 0004 evidence.
 - No live Narō smoke test has been run; adapter tests use local fixtures and test servers.
+- Notification tests: grouped RU/EN messages, dedupe, failure then retry, permanent failure not retried, no configured Telegram, token not leaked, `scan --no-notify`, `notify` JSON and automatic delivery: see task 0006 evidence.
 - Application/scan/CLI tests: first add baseline without events, duplicate add (including offline), one/many new chapters, replay without duplicates, failure/recovery, empty and sliding RSS windows, count-only reconciliation (including previously removed releases), repeated status transitions, due/global intervals, pause/resume/remove, restart, recent-event history and pagination, metadata/status payloads, invalid/unknown URLs, concurrent scan lock, partial scan isolation and JSON CLI flows: see task 0005 evidence.
 
 ## Deployed
@@ -49,4 +51,4 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Next step
 
-Task 0006: Telegram outbox, retry and RU/EN notifications.
+Task 0007: backup/restore, full doctor, systemd installation and Whoosh assessment.

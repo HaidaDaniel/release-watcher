@@ -1,6 +1,6 @@
 # Release Watcher
 
-Status: MVP vertical slice. The repository foundation, SQLite persistence, Narō/RSS/Atom adapters, scan detection and the CLI vertical slice are implemented. Telegram delivery, backup/restore, installation proof and the Whoosh deployment spike are still planned; this document separates those states explicitly.
+Status: MVP vertical slice plus notifications. The repository foundation, SQLite persistence, Narō/RSS/Atom adapters, scan detection, CLI vertical slice and the optional durable Telegram outbox are implemented. Backup/restore, installation proof and the Whoosh deployment spike are still planned; this document separates those states explicitly.
 
 ## Mission
 
@@ -46,7 +46,7 @@ release-watcher scan --due
 | Narō adapter and baseline detection | planned |
 | RSS/Atom adapter | planned |
 | `add`, `list`, `show`, `scan`, `events`, pause/resume/interval/remove | planned |
-| Telegram outbox and retries | planned |
+| Telegram outbox, retries and RU/EN messages | implemented |
 | Doctor (foundation config/environment checks) | implemented |
 | Backup/restore | planned |
 | systemd timer installation proof | planned |

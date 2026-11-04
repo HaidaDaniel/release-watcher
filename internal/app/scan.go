@@ -14,8 +14,9 @@ import (
 )
 
 type ScanOptions struct {
-	Mode string
-	ID   string
+	Mode     string
+	ID       string
+	NoNotify bool
 }
 
 func (s *Service) Scan(ctx context.Context, opts ScanOptions) (*ScanResult, *Error) {
@@ -78,7 +79,14 @@ func (s *Service) Scan(ctx context.Context, opts ScanOptions) (*ScanResult, *Err
 		result.EventsCreated += watchResult.EventsCreated
 	}
 	result.FinishedAt = s.now()
-	result.Notifications = NotificationCounts{}
+	if !opts.NoNotify && s.notifier != nil {
+		counts, flushErr := s.FlushDeliveries(ctx)
+		if flushErr != nil {
+			s.logger.Error("notification flush failed", "error", flushErr.Message)
+		} else {
+			result.Notifications = counts
+		}
+	}
 	return result, nil
 }
 
@@ -294,6 +302,7 @@ func (s *Service) applyChange(ctx context.Context, q *store.Queries, b *bundle, 
 		return 0, "", buildErr
 	}
 	created := 0
+	var insertedEvents []*domain.Event
 	for _, event := range events {
 		inserted, insertErr := q.InsertEvent(ctx, event)
 		if insertErr != nil {
@@ -301,6 +310,23 @@ func (s *Service) applyChange(ctx context.Context, q *store.Queries, b *bundle, 
 		}
 		if inserted {
 			created++
+			insertedEvents = append(insertedEvents, event)
+		}
+	}
+	if s.notifier != nil {
+		for _, event := range insertedEvents {
+			_, deliveryErr := q.InsertDelivery(ctx, &domain.NotificationDelivery{
+				ID:            id.New("del"),
+				EventID:       event.ID,
+				Channel:       s.notifier.Name(),
+				Status:        domain.DeliveryPending,
+				NextAttemptAt: now,
+				CreatedAt:     now,
+				UpdatedAt:     now,
+			})
+			if deliveryErr != nil {
+				return 0, "", deliveryErr
+			}
 		}
 	}
 	result := domain.ScanUnchanged

@@ -2,7 +2,7 @@
 
 A small self-hosted watcher for new chapters and volumes from public sources. One Go binary, SQLite state, a CLI and an optional systemd timer (hourly by default, with a 24h default check interval). No server, no Docker, no LLM during scans.
 
-Status: MVP vertical slice. Add a source, store a silent baseline, scan for new chapters, read events and use stable JSON from any agent. Telegram delivery, backup/restore and installation proof are still being implemented. See [docs/progress.md](docs/progress.md).
+Status: MVP vertical slice plus notifications. Add a source, store a silent baseline, scan for new chapters, read events, use stable JSON from any agent and optionally receive grouped Telegram messages. Backup/restore and installation proof are still being implemented. See [docs/progress.md](docs/progress.md).
 
 ## Build from source
 

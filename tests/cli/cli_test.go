@@ -272,3 +272,95 @@ func TestCLIHumanLanguage(t *testing.T) {
 		t.Fatalf("en list = %d %q", code, stdout)
 	}
 }
+
+type telegramServer struct {
+	mu       sync.Mutex
+	messages []string
+	server   *httptest.Server
+}
+
+func newTelegramServer(t *testing.T) *telegramServer {
+	t.Helper()
+	f := &telegramServer{}
+	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		_ = r.ParseForm()
+		f.messages = append(f.messages, r.Form.Get("text"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	t.Cleanup(f.server.Close)
+	return f
+}
+
+func (f *telegramServer) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.messages)
+}
+
+func TestCLINotifyAndNoNotify(t *testing.T) {
+	feed := newFeedServer(t, "A")
+	tg := newTelegramServer(t)
+	env := testEnv(t)
+	env["RELEASE_WATCHER_TELEGRAM_BOT_TOKEN"] = "TEST_TOKEN"
+	env["RELEASE_WATCHER_TELEGRAM_CHAT_ID"] = "chat-1"
+	env["RELEASE_WATCHER_TELEGRAM_API_BASE"] = tg.server.URL
+
+	code, stdout, _ := runCLI(t, env, "add", feed.server.URL+"/feed.xml", "--json")
+	if code != 0 {
+		t.Fatalf("add = %s", stdout)
+	}
+	watchID := dataMap(t, decodeEnvelope(t, stdout))["watch_id"].(string)
+	feed.set("A", "B")
+
+	code, stdout, _ = runCLI(t, env, "scan", "--id", watchID, "--no-notify", "--json")
+	if code != 0 {
+		t.Fatalf("scan no-notify = %s", stdout)
+	}
+	if tg.count() != 0 {
+		t.Fatal("--no-notify still sent Telegram")
+	}
+	scanData := dataMap(t, decodeEnvelope(t, stdout))
+	notifications := scanData["notifications"].(map[string]any)
+	if notifications["sent"] != float64(0) {
+		t.Fatalf("notifications = %v", notifications)
+	}
+
+	code, stdout, _ = runCLI(t, env, "notify", "--json")
+	if code != 0 {
+		t.Fatalf("notify = %s", stdout)
+	}
+	counts := dataMap(t, decodeEnvelope(t, stdout))
+	if counts["sent"] != float64(1) || counts["pending"] != float64(0) {
+		t.Fatalf("counts = %v", counts)
+	}
+	if tg.count() != 1 {
+		t.Fatalf("messages = %d", tg.count())
+	}
+	code, _, _ = runCLI(t, env, "notify", "--json")
+	if code != 0 || tg.count() != 1 {
+		t.Fatalf("duplicate notify: code=%d messages=%d", code, tg.count())
+	}
+
+	code, stdout, _ = runCLI(t, env, "scan", "--id", watchID, "--json")
+	if code != 0 {
+		t.Fatalf("scan = %s", stdout)
+	}
+	counts = dataMap(t, decodeEnvelope(t, stdout))["notifications"].(map[string]any)
+	if counts["sent"] != float64(1) || tg.count() != 1 {
+		t.Fatalf("automatic notifications = %v messages=%d", counts, tg.count())
+	}
+}
+
+func TestCLINotifyRequiresConfiguration(t *testing.T) {
+	env := testEnv(t)
+	code, stdout, _ := runCLI(t, env, "notify", "--json")
+	if code != cli.ExitError {
+		t.Fatalf("exit = %d", code)
+	}
+	if decodeEnvelope(t, stdout)["error"].(map[string]any)["code"] != "config_error" {
+		t.Fatalf("error = %s", stdout)
+	}
+}

@@ -176,7 +176,7 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
 
 ## `scan`
 
-Input: `scan [--due|--all|--id <watch-id>] [--no-notify] [--json] [--log-json]`.
+Input: `scan [--due|--all|--id <watch-id>] [--no-notify] [--json] [--log-json]`. `--no-notify` stores events and deliveries without sending them in this run; a later `notify` flushes them.
 
 Success `data`:
 
@@ -188,7 +188,7 @@ Success `data`:
   "succeeded": 1,
   "failed": 1,
   "events_created": 1,
-  "notifications": {"pending": 0, "sent": 0, "failed": 0},
+  "notifications": {"pending": 0, "sent": 1, "failed": 0},
   "results": [
     {
       "watch_id": "watch_...",
@@ -212,7 +212,7 @@ Success `data`:
 }
 ```
 
-One watch failure never prevents the rest. The process exits 3 for a partial failure; the JSON is still complete. The lock error exits 4. Notification counts stay zero until the Telegram outbox task; events are already durable.
+One watch failure never prevents the rest. The process exits 3 for a partial failure; the JSON is still complete. The lock error exits 4. Notification counts reflect the outbox after the scan: pending, sent and failed. Events are durable regardless of Telegram.
 
 ## `events`
 
@@ -287,10 +287,16 @@ Count-only events have `release_ids: []`, a non-null `previous_count`/`current_c
 
 `pause`, `resume` and `interval` return the affected watch object in `data` (same fields as `list`). `interval --global 24h` returns `{"global_interval_seconds": 86400}` and updates every watch still using the previous default interval; watches with a custom interval keep it. `interval <id> 24h` validates a duration of at least 1m and stores it in seconds. `remove <id> --yes` returns `{"removed": true, "watch_id": "...", "publication_id": "..."}`; it deletes the watch, publication line, releases, events, deliveries and scan runs in one transaction. Work/Source rows are removed only when unreferenced. Removing one watch never touches another publication line.
 
-## `doctor`, `backup`, `restore`, `notify`
+## `notify`
+
+`notify [--json]` flushes due deliveries and returns `{"pending":N,"sent":N,"failed":N}`. It uses the same process lock as `scan`, so a manual notify cannot race a timer scan into sending the same delivery twice. It requires Telegram configuration; without it the command returns `config_error`. Sending is bounded by `RELEASE_WATCHER_MAX_DELIVERY_ATTEMPTS`; 429 uses `retry_after`, other 5xx/network failures use backoff, and permanent 4xx failures are not retried. A delivery is unique per `(event_id, channel)`, so a repeated scan/flush never duplicates a message. Deliveries are created only for events detected while Telegram is configured; historical events are not sent retroactively. Events remain readable if every attempt fails.
+
+Messages are grouped per event (a multi-chapter event becomes one message), use RU by default and EN with `RELEASE_WATCHER_LANG=en`, never include the bot token, and are truncated below Telegram's 4096-character limit.
+
+## `doctor`, `backup`, `restore`
 
 - `doctor --json` is implemented as a read-only configuration/environment check and returns `{"healthy":true|false,"checks":[{"id":"...","status":"ok|warn|error","message":"..."}]}`. It does not migrate. A deeper schema/permission probe is part of the installation task.
-- `backup`, `restore` and `notify` are planned for the notification and installation tasks; they are not implemented in the current candidate. Their planned shapes are `{"path":"...","schema_version":...,"bytes":N,"created_at":"..."}`, the restored schema version with an exclusivity warning, and delivery counts without secrets.
+- `backup` and `restore` are planned for the installation task; they are not implemented in the current candidate. Their planned shapes are `{"path":"...","schema_version":...,"bytes":N,"created_at":"..."}` and the restored schema version with an exclusivity warning.
 
 ## Media Core import
 

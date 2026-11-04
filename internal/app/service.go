@@ -10,6 +10,7 @@ import (
 
 	"github.com/HaidaDaniel/release-watcher/internal/config"
 	"github.com/HaidaDaniel/release-watcher/internal/domain"
+	"github.com/HaidaDaniel/release-watcher/internal/notifier"
 	"github.com/HaidaDaniel/release-watcher/internal/source"
 	"github.com/HaidaDaniel/release-watcher/internal/store"
 )
@@ -18,11 +19,12 @@ const defaultIntervalSetting = "default_interval_seconds"
 
 // Service contains the application use cases shared by the CLI and future MCP.
 type Service struct {
-	cfg     config.Config
-	store   *store.Store
-	sources *source.Registry
-	now     func() time.Time
-	logger  *slog.Logger
+	cfg      config.Config
+	store    *store.Store
+	sources  *source.Registry
+	now      func() time.Time
+	logger   *slog.Logger
+	notifier notifier.Notifier
 }
 
 func New(cfg config.Config, st *store.Store, sources *source.Registry, logger *slog.Logger) *Service {
@@ -34,6 +36,21 @@ func New(cfg config.Config, st *store.Store, sources *source.Registry, logger *s
 
 // SetNow injects a clock for deterministic tests.
 func (s *Service) SetNow(now func() time.Time) { s.now = now }
+
+// SetNotifier installs the optional delivery channel.
+func (s *Service) SetNotifier(n notifier.Notifier) { s.notifier = n }
+
+// NotificationsEnabled reports whether a delivery channel is configured.
+func (s *Service) NotificationsEnabled() bool { return s.notifier != nil }
+
+// SetLanguage changes human/notification language for tests and future callers.
+func (s *Service) SetLanguage(lang string) {
+	if lang == "en" {
+		s.cfg.Lang = "en"
+		return
+	}
+	s.cfg.Lang = "ru"
+}
 
 func (s *Service) DefaultInterval(ctx context.Context) (time.Duration, error) {
 	setting, err := s.store.Queries().GetSetting(ctx, defaultIntervalSetting)

@@ -30,7 +30,7 @@ Exit: state survives restart; migrations are append-only; dedupe and baseline ar
 
 Exit: add `https://ncode.syosetu.com/n2166fe/`, baseline without a false notification, detect a fixture new chapter, read the event through CLI JSON. Reached with fixture HTTP servers; the live Narō smoke remains a separate polite check.
 
-## Stage 3 — Notifications (task 0006)
+## Stage 3 — Notifications (task 0006) — done
 
 - Durable Telegram outbox, pending/sent/failed, retry/backoff, dedupe.
 - Grouped RU/EN messages.

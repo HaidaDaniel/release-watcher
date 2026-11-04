@@ -138,7 +138,7 @@ func (r *runner) scan(ctx context.Context, args []string) int {
 		return r.fail(openErr)
 	}
 	defer closeStore()
-	result, appErr := svc.Scan(ctx, app.ScanOptions{Mode: mode, ID: values["id"]})
+	result, appErr := svc.Scan(ctx, app.ScanOptions{Mode: mode, ID: values["id"], NoNotify: flagBool(values, "no-notify")})
 	if appErr != nil {
 		return r.failApp(appErr)
 	}
@@ -203,6 +203,37 @@ func (r *runner) events(ctx context.Context, args []string) int {
 		return ExitOK
 	}
 	r.printEvents(result)
+	return ExitOK
+}
+
+func (r *runner) notify(ctx context.Context, args []string) int {
+	_, positionals, err := parseCommandArgs(args, map[string]flagKind{})
+	if err != nil {
+		return r.fail(err)
+	}
+	if len(positionals) != 0 {
+		return r.fail(&commandError{code: "usage", message: "notify takes no arguments", exit: ExitUsage})
+	}
+	svc, closeStore, openErr := r.openService(ctx)
+	if openErr != nil {
+		return r.fail(openErr)
+	}
+	defer closeStore()
+	if !svc.NotificationsEnabled() {
+		return r.fail(&commandError{code: "config_error", message: r.t("Telegram не настроен", "Telegram is not configured"), exit: ExitError})
+	}
+	counts, appErr := svc.Notify(ctx)
+	if appErr != nil {
+		return r.failApp(appErr)
+	}
+	if r.json {
+		r.writeJSON(envelope{SchemaVersion: SchemaVersion, OK: true, Data: counts})
+		return ExitOK
+	}
+	fmt.Fprintf(r.stdout, "%s: %d, %s: %d, %s: %d\n",
+		r.t("Ожидают", "Pending"), counts.Pending,
+		r.t("Отправлено", "Sent"), counts.Sent,
+		r.t("Ошибок", "Failed"), counts.Failed)
 	return ExitOK
 }
 
