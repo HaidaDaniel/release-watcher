@@ -30,6 +30,8 @@ type Config struct {
 	TelegramToken     string
 	TelegramChatID    string
 	TelegramAPIBase   string
+	NaroAPIBase       string
+	NaroCatalogBase   string
 	AllowPrivateHosts bool
 	MaxDeliveryTries  int
 	MaxRedirects      int
@@ -141,6 +143,15 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 	}
 
+	naroAPIBase := strings.TrimSpace(getenv("RELEASE_WATCHER_NARO_API_BASE"))
+	if naroAPIBase != "" && !strings.HasPrefix(naroAPIBase, "http://") && !strings.HasPrefix(naroAPIBase, "https://") {
+		return Config{}, fmt.Errorf("RELEASE_WATCHER_NARO_API_BASE must be an http(s) URL")
+	}
+	naroCatalogBase := strings.TrimSpace(getenv("RELEASE_WATCHER_NARO_CATALOG_BASE"))
+	if naroCatalogBase != "" && !strings.HasPrefix(naroCatalogBase, "http://") && !strings.HasPrefix(naroCatalogBase, "https://") {
+		return Config{}, fmt.Errorf("RELEASE_WATCHER_NARO_CATALOG_BASE must be an http(s) URL")
+	}
+
 	telegramAPIBase := strings.TrimSpace(getenv("RELEASE_WATCHER_TELEGRAM_API_BASE"))
 	if telegramAPIBase == "" {
 		telegramAPIBase = "https://api.telegram.org"
@@ -167,6 +178,8 @@ func Load(getenv func(string) string) (Config, error) {
 		TelegramToken:     strings.TrimSpace(getenv("RELEASE_WATCHER_TELEGRAM_BOT_TOKEN")),
 		TelegramChatID:    strings.TrimSpace(getenv("RELEASE_WATCHER_TELEGRAM_CHAT_ID")),
 		TelegramAPIBase:   strings.TrimRight(telegramAPIBase, "/"),
+		NaroAPIBase:       naroAPIBase,
+		NaroCatalogBase:   naroCatalogBase,
 		AllowPrivateHosts: allowPrivate,
 		MaxDeliveryTries:  maxTries,
 		MaxRedirects:      maxRedirects,

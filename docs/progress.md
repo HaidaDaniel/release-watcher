@@ -38,7 +38,8 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - `scripts/verify-push.sh` runs gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...` and APK lint, and fails clearly when pnpm is missing. Secret-scanner tests prove the matched value never reaches stdout/stderr.
 - Narō status tests cover `end=0`, `end=1`, `null`, missing and unsupported values, plus `ongoing -> completed -> ongoing` transitions: see task 0011 evidence.
 - Source tests: SSRF address policy (including exotic IPv6) and dial-time blocking, retry, pacing, header/body timeout, cancellation, redirect/body limits, status mapping, Narō catalog/pagination/partial/count-only/status-unknown/undercount/missing-update-block/empty-first-page/404-page-boundary, RSS 2.0/RSS 1.0/Atom parsing, relative links, fallback-id collisions and kind mismatch: see task 0004 evidence.
-- No live Narō smoke test has been run; adapter tests use local fixtures and test servers.
+- A polite live Narō smoke against `N2166FE` records the actual API/catalog response: title `夢見る男子は現実主義者`, `ncode:N2166FE`, status `ongoing` (`end=1`), 210 baseline chapters, more than one catalog page and parsed publication dates; the baseline emitted no events. See task 0015 evidence.
+- Isolated E2E covers 210→212 chapters, one grouped RU Telegram message (`+2`), replay dedupe, Telegram failure, restart/redelivery with no due watches, two-watch isolation and JSON output at each CLI stage: see task 0015 evidence.
 - Notification tests: grouped RU/EN messages and grammar, dedupe, failure then retry, 429 retry_after, non-JSON 5xx/429 retries, permanent 403/400 not retried, max-attempt exhaustion, invalid responses, failed-delivery restart persistence, no configured Telegram, token not leaked in errors/stored last_error, `scan --no-notify` pending counts, `notify` JSON and automatic delivery: see task 0006 evidence.
 - Application/scan/CLI tests: first add baseline without events, duplicate add (including offline), one/many new chapters, replay without duplicates, failure/recovery, empty and sliding RSS windows, count-only reconciliation (including previously removed releases), repeated status transitions, due/global intervals, pause/resume/remove, restart, recent-event history and pagination, metadata/status payloads, invalid/unknown URLs, concurrent scan lock, partial scan isolation and JSON CLI flows: see task 0005 evidence. Unwatch history preservation, re-add restoration and explicit purge: see task 0014 evidence.
 - Installation tests: daily timer cadence, timer drop-ins and calendar-step parsing, doctor schedule warning, and lingering guidance: see task 0013 evidence.
@@ -52,8 +53,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 ## Blocked
 
 - Whoosh Core live deployment: no test host; assessment documented but not executed. Separate backlog task.
-- A live Narō smoke test has not been run; adapters use fixtures and local test servers.
 
 ## Next step
 
-Remaining backlog: Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), a polite live Narō smoke test, MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.
+Remaining backlog: Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.

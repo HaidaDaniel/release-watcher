@@ -260,7 +260,14 @@ func (r *runner) openService(ctx context.Context) (*app.Service, func(), *comman
 		MaxBodyBytes:      cfg.MaxBodyBytes,
 		AllowPrivateHosts: cfg.AllowPrivateHosts,
 	})
-	reg := source.NewRegistry(client)
+	naro := source.NewNaro(client)
+	if cfg.NaroAPIBase != "" {
+		naro.APIBase = cfg.NaroAPIBase
+	}
+	if cfg.NaroCatalogBase != "" {
+		naro.CatalogBase = cfg.NaroCatalogBase
+	}
+	reg := source.NewRegistryWithAdapters(naro, source.NewFeed(client))
 	svc := app.New(cfg, st, reg, logger)
 	if cfg.TelegramEnabled() {
 		svc.SetNotifier(notifier.NewTelegram(cfg.TelegramAPIBase, cfg.TelegramToken, cfg.TelegramChatID, cfg.HTTPTimeout))

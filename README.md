@@ -48,6 +48,8 @@ scripts/verify-fast.sh
 scripts/verify-push.sh
 ```
 
+A polite live Narō smoke is opt-in: `RELEASE_WATCHER_LIVE_NARO=1 go test ./tests/e2e -run TestLiveNaroBaselineSmoke -v`.
+
 The user systemd timer runs daily at 04:15 local time with `Persistent=true`; see [deployment](docs/deployment.md) for shorter-interval overrides and `loginctl enable-linger`.
 
 Node.js and pnpm are required only for the development workflow, never for production. `scripts/verify-push.sh` fails clearly when pnpm is missing instead of skipping APK lint. The secret scanner reports only file, line and secret type; it is an accident guard, not a Git-history audit.

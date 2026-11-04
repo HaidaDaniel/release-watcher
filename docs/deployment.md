@@ -74,6 +74,8 @@ Environment variables are read at process start. Put secrets only in a protected
 | `RELEASE_WATCHER_TELEGRAM_BOT_TOKEN` | unset | optional Telegram bot token |
 | `RELEASE_WATCHER_TELEGRAM_CHAT_ID` | unset | optional Telegram chat id |
 | `RELEASE_WATCHER_ALLOW_PRIVATE_HOSTS` | `false` | test/dev only; weakens SSRF protection |
+| `RELEASE_WATCHER_NARO_API_BASE` | unset | test/dev only; override the Narō API base for local E2E |
+| `RELEASE_WATCHER_NARO_CATALOG_BASE` | unset | test/dev only; override the Narō catalog base for local E2E |
 
 Secrets are never logged and never stored in SQLite.
 
