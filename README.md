@@ -1,6 +1,6 @@
 # Release Watcher
 
-A small self-hosted watcher for new chapters and volumes from public sources. One Go binary, SQLite state, a CLI and an optional daily systemd timer. No server, no Docker, no LLM during scans.
+A small self-hosted watcher for new chapters and volumes from public sources. One Go binary, SQLite state, a CLI and an optional systemd timer (hourly by default, with a 24h default check interval). No server, no Docker, no LLM during scans.
 
 Status: MVP foundation. The repository, docs, build identity and local hooks are in place. Storage, source adapters, scanning, notifications and installation proof are being implemented task by task. See [docs/progress.md](docs/progress.md).
 

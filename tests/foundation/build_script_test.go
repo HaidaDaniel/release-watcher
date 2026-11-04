@@ -29,20 +29,29 @@ func runBuild(t *testing.T, args ...string) (string, string, error) {
 	return stdout.String(), stderr.String(), err
 }
 
-func TestBuildScriptRejectsBareDate(t *testing.T) {
-	_, stderr, err := runBuild(t,
-		"--mode", "release",
-		"--version", "0.1.0",
-		"--commit", strings.Repeat("a", 40),
-		"--built-at", "2026-11-04",
-		"--out-dir", t.TempDir(),
-		"--allow-dirty",
-	)
-	if err == nil {
-		t.Fatal("expected bare date to be rejected")
-	}
-	if !strings.Contains(stderr, "RFC3339") {
-		t.Fatalf("stderr = %q, want RFC3339 diagnostic", stderr)
+func TestBuildScriptRejectsInvalidRFC3339(t *testing.T) {
+	for _, builtAt := range []string{
+		"2026-11-04",
+		"2026-11-04T12:00:00+24:00",
+		"2026-11-04T12:00:00+23:60",
+		"2026-11-04T12:00:00+00:60",
+	} {
+		t.Run(strings.NewReplacer(":", "_", "+", "plus").Replace(builtAt), func(t *testing.T) {
+			_, stderr, err := runBuild(t,
+				"--mode", "release",
+				"--version", "0.1.0",
+				"--commit", strings.Repeat("a", 40),
+				"--built-at", builtAt,
+				"--out-dir", t.TempDir(),
+				"--allow-dirty",
+			)
+			if err == nil {
+				t.Fatalf("expected %q to be rejected", builtAt)
+			}
+			if !strings.Contains(stderr, "RFC3339") {
+				t.Fatalf("stderr = %q, want RFC3339 diagnostic", stderr)
+			}
+		})
 	}
 }
 

@@ -212,15 +212,13 @@ func (r *runner) doctor(ctx context.Context) int {
 		add("build_identity", "ok", "build identity is valid")
 	}
 
-	root := gitOutput(ctx, "rev-parse", "--show-toplevel")
+	root := gitOutput(ctx, "", "rev-parse", "--show-toplevel")
 	if root == "" {
 		root, _ = os.Getwd()
 	}
-	hookPath := gitOutput(ctx, "rev-parse", "--git-path", "hooks/pre-commit")
+	hookPath := gitOutput(ctx, root, "rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-commit")
 	if hookPath == "" {
 		hookPath = filepath.Join(root, ".git", "hooks", "pre-commit")
-	} else if !filepath.IsAbs(hookPath) {
-		hookPath = filepath.Join(root, hookPath)
 	}
 	if _, statErr := os.Stat(hookPath); statErr == nil {
 		add("hooks", "ok", "pre-commit hook is installed")
@@ -261,7 +259,10 @@ func (r *runner) doctor(ctx context.Context) int {
 	return ExitOK
 }
 
-func gitOutput(ctx context.Context, args ...string) string {
+func gitOutput(ctx context.Context, dir string, args ...string) string {
+	if dir != "" {
+		args = append([]string{"-C", dir}, args...)
+	}
 	cmd := exec.CommandContext(ctx, "git", args...)
 	out, err := cmd.Output()
 	if err != nil {

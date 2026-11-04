@@ -59,7 +59,7 @@ if [[ "$mode" == release ]]; then
     echo "build: release mode requires a full 40-character commit SHA" >&2
     exit 1
   fi
-  if ! [[ "$built_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
+  if ! [[ "$built_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$ ]]; then
     echo "build: release mode requires an RFC3339 built_at (for example 2026-11-04T12:00:00Z)" >&2
     exit 1
   fi
