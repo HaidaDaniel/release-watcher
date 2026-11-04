@@ -73,7 +73,7 @@ func (s *Service) SetInterval(ctx context.Context, watchID string, interval time
 		return nil, newError("invalid_argument", "interval must be at least 1m", nil)
 	}
 	now := s.now()
-	nextCheck := now.Add(interval)
+	nextCheck := s.nextCheckAfter(now, interval)
 	txErr := s.store.InTx(ctx, func(q *store.Queries) error {
 		watch, err := q.GetWatch(ctx, watchID)
 		if err != nil {

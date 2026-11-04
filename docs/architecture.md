@@ -38,7 +38,7 @@ Dependencies point inward: CLI and adapters depend on application/domain types; 
 
 The model is "run when needed", not "stay alive".
 
-- `next_check_at` is computed from the watch interval after a successful scan.
+- `next_check_at` is computed from the watch interval after a successful scan. Intervals that are whole local calendar days are aligned to the next eligible local midnight in `RELEASE_WATCHER_TIMEZONE`; this keeps a daily timer from skipping a day because of jitter or DST. Other intervals stay duration-based.
 - `scan --due` runs anything overdue, which recovers missed timer runs.
 - `scan --all` is an explicit manual override.
 - `scan --id` processes one watch.

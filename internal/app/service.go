@@ -74,7 +74,7 @@ func (s *Service) SetGlobalInterval(ctx context.Context, interval time.Duration)
 	seconds := int64(interval / time.Second)
 	oldSeconds := int64(oldInterval / time.Second)
 	now := s.now()
-	nextCheck := now.Add(interval)
+	nextCheck := s.nextCheckAfter(now, interval)
 	txErr := s.store.InTx(ctx, func(q *store.Queries) error {
 		if err := q.SetSetting(ctx, defaultIntervalSetting, strconv.FormatInt(seconds, 10), now); err != nil {
 			return err

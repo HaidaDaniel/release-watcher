@@ -165,6 +165,7 @@ func newTestEnv(t *testing.T, naro *naroFixture) *testEnv {
 		DBPath:            filepath.Join(dir, "release-watcher.db"),
 		LockPath:          filepath.Join(dir, "scan.lock"),
 		DefaultInterval:   time.Hour,
+		Location:          time.UTC,
 		HTTPTimeout:       2 * time.Second,
 		UserAgent:         "release-watcher-test",
 		Lang:              "ru",

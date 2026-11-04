@@ -78,7 +78,7 @@ func (s *Service) Add(ctx context.Context, in AddInput) (*AddResult, *Error) {
 		originalTitle = snapshot.OriginalURL
 	}
 	now := s.now()
-	nextCheck := now.Add(interval)
+	nextCheck := s.nextCheckAfter(now, interval)
 
 	var (
 		createdWatchID string
@@ -293,7 +293,7 @@ func (s *Service) restoreAdd(ctx context.Context, existing *AddResult) (*AddResu
 		if watch.RemovedAt == nil {
 			return nil
 		}
-		nextCheck := now.Add(time.Duration(watch.IntervalSeconds) * time.Second)
+		nextCheck := s.nextCheckAfter(now, time.Duration(watch.IntervalSeconds)*time.Second)
 		if err := q.RestoreWatch(ctx, watch.ID, nextCheck, now); err != nil {
 			return err
 		}

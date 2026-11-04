@@ -22,6 +22,7 @@ type Config struct {
 	DBPath            string
 	LockPath          string
 	DefaultInterval   time.Duration
+	Location          *time.Location
 	HTTPTimeout       time.Duration
 	UserAgent         string
 	Lang              string
@@ -70,6 +71,15 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if timeout < time.Second {
 		return Config{}, fmt.Errorf("RELEASE_WATCHER_HTTP_TIMEOUT must be at least 1s")
+	}
+
+	location := time.Local
+	if name := strings.TrimSpace(getenv("RELEASE_WATCHER_TIMEZONE")); name != "" {
+		loaded, err := time.LoadLocation(name)
+		if err != nil {
+			return Config{}, fmt.Errorf("RELEASE_WATCHER_TIMEZONE must be an IANA timezone such as Europe/Berlin: %w", err)
+		}
+		location = loaded
 	}
 
 	lang := strings.ToLower(strings.TrimSpace(getenv("RELEASE_WATCHER_LANG")))
@@ -170,6 +180,7 @@ func Load(getenv func(string) string) (Config, error) {
 		DBPath:            dbPath,
 		LockPath:          filepath.Join(stateDir, "scan.lock"),
 		DefaultInterval:   interval,
+		Location:          location,
 		HTTPTimeout:       timeout,
 		UserAgent:         userAgent,
 		Lang:              lang,

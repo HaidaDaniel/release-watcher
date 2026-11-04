@@ -206,7 +206,7 @@ func (s *Service) applyBaseline(ctx context.Context, q *store.Queries, b *bundle
 	if snapshot.Mode == domain.ModeCountOnly || len(change.Added) == 0 {
 		count = snapshot.Count
 	}
-	nextCheck := now.Add(time.Duration(b.watch.IntervalSeconds) * time.Second)
+	nextCheck := s.nextCheckAfter(now, time.Duration(b.watch.IntervalSeconds)*time.Second)
 	if err := q.UpdateWatchBaseline(ctx, b.watch.ID, now, &count, change.Mode, now); err != nil {
 		return err
 	}
@@ -274,7 +274,7 @@ func (s *Service) applyChange(ctx context.Context, q *store.Queries, b *bundle, 
 	}
 
 	interval := time.Duration(b.watch.IntervalSeconds) * time.Second
-	nextCheck := now.Add(interval)
+	nextCheck := s.nextCheckAfter(now, interval)
 	if err := q.UpdateWatchAfterSuccess(ctx, b.watch.ID, now, now, nextCheck, change.Mode, now); err != nil {
 		return 0, "", err
 	}
