@@ -1,7 +1,7 @@
 # Task 0010 - Final MVP progress and handoff status
 
-State: todo
-Owner: none
+State: done
+Owner: opencode-primary
 Mode: mvp
 Lane: planning
 Scope: docs,status
