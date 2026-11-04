@@ -6,3 +6,5 @@
 - Use focused feedback during edits and a non-overlapping final verification set on the committed candidate; coverage already runs its measured tests.
 - Documentation-only tasks need applicable contract, link, or example checks rather than unrelated application suites.
 - Independent review inspects current trusted evidence and focused counterexamples; rerun broader checks when evidence is stale, failed, missing, or insufficient.
+
+- Pre-push verification is mandatory in normal development: missing pnpm/APK is an error, not a silent skip. Secret scanning covers staged additions and never prints matched values.

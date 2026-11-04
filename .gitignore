@@ -4,12 +4,39 @@
 /release-watcher
 *.test
 
-# Runtime state
+# Runtime state and local databases
 .local/
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
 *.rwbackup
+*.bak
+*.backup
+*.tmp
+*.orig
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+release-watcher.env
+telegram.env
+telegram*.json
+*.telegram
+*telegram*token*
+
+# Logs, caches and runtime output
+*.log
+/logs/
+/runtime/
+/.cache/
+coverage.out
+*.coverprofile
 
 # Tooling
 node_modules/

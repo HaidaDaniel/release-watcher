@@ -57,7 +57,7 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 
 - Date: 2026-11-04
 - Status: Accepted
-- Decision: Lefthook provides a fast pre-commit (gofmt on staged Go files, secret scan, repository/build sanity) and a fuller pre-push (`go test ./...`, `go vet ./...`, `go build ./...`, APK lint). `go test -race` is an explicit extended check, enabled in pre-push only when its cost is acceptable. The secret scan covers staged, working-tree and untracked additions; it is an accident guard, not a full Git-history audit. No `.github/workflows` exists before MVP acceptance.
+- Decision: Lefthook provides a fast pre-commit (gofmt on staged Go files, whitespace check and a non-leaking secret scan of staged additions) and a mandatory pre-push (all Go files gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...`, APK lint). Pre-push fails with a clear error when `pnpm`/APK is unavailable; APK lint is never silently skipped. `go test -race` is an explicit extended check, required at MVP acceptance. The secret scanner prints only file, line and secret type, never the matched value, and is an accident guard, not a full Git-history audit. No `.github/workflows` exists before MVP acceptance.
 - Consequences: Verification stays local and runnable. CI can be added later as a mirror of the same commands, not as a new source of truth.
 
 ## ADR-0009 — AgenticProjectKit is a development tool, not a runtime dependency

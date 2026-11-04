@@ -13,7 +13,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - APK v0.5.2 pinned as a dev dependency; repository initialized in `mvp` mode.
 - Foundation documentation with explicit non-goals and honest status.
 - Go CLI bootstrap with build identity (`version`, `help`, `doctor` skeleton).
-- Lefthook pre-commit/pre-push configuration and local verification scripts.
+- Lefthook pre-commit/pre-push configuration and local verification scripts; pre-push requires pnpm/APK lint and the secret scanner prints only file/line/type.
 - Linux systemd service/timer skeletons.
 - Build script for linux/amd64 and linux/arm64 with ldflags identity.
 - Domain entities and SQLite schema version 1 with Work, Source, Publication, Watch, Release, Event, NotificationDelivery, ScanRun and Setting tables.
@@ -35,7 +35,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 - Foundation CLI JSON, help localization and build identity tests: see task 0002 evidence.
 - Store tests: migrations idempotent, restart persistence, rollback, due-watch selection, event/delivery dedupe, release baseline/removal, transactional observation deletion (including shared Work/Source retention), invalid-enum rejection, unknown-cursor rejection, concurrent first-open migration locking and settings: see task 0003 evidence.
-- `scripts/verify-push.sh` runs gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...` and APK lint.
+- `scripts/verify-push.sh` runs gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...` and APK lint, and fails clearly when pnpm is missing. Secret-scanner tests prove the matched value never reaches stdout/stderr.
 - Narō status tests cover `end=0`, `end=1`, `null`, missing and unsupported values, plus `ongoing -> completed -> ongoing` transitions: see task 0011 evidence.
 - Source tests: SSRF address policy (including exotic IPv6) and dial-time blocking, retry, pacing, header/body timeout, cancellation, redirect/body limits, status mapping, Narō catalog/pagination/partial/count-only/status-unknown/undercount/missing-update-block/empty-first-page/404-page-boundary, RSS 2.0/RSS 1.0/Atom parsing, relative links, fallback-id collisions and kind mismatch: see task 0004 evidence.
 - No live Narō smoke test has been run; adapter tests use local fixtures and test servers.

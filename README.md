@@ -48,7 +48,7 @@ scripts/verify-fast.sh
 scripts/verify-push.sh
 ```
 
-Node.js and pnpm are required only for the development workflow, never for production.
+Node.js and pnpm are required only for the development workflow, never for production. `scripts/verify-push.sh` fails clearly when pnpm is missing instead of skipping APK lint. The secret scanner reports only file, line and secret type; it is an accident guard, not a Git-history audit.
 
 ## Boundaries
 
