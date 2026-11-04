@@ -26,7 +26,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 ## Tested
 
 - Foundation CLI JSON, help localization and build identity tests: see task 0002 evidence.
-- Store tests: migrations idempotent, restart persistence, rollback, due-watch selection, event/delivery dedupe, release baseline/removal, observation deletion, invalid-enum rejection, unknown-cursor rejection, concurrent open and settings: see task 0003 evidence.
+- Store tests: migrations idempotent, restart persistence, rollback, due-watch selection, event/delivery dedupe, release baseline/removal, transactional observation deletion (including shared Work/Source retention), invalid-enum rejection, unknown-cursor rejection, concurrent first-open migration locking and settings: see task 0003 evidence.
 - `scripts/verify-push.sh` runs gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...` and APK lint.
 - No adapter, fixture or live Narō test exists yet; those tests belong to tasks 0004–0005.
 

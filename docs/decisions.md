@@ -16,7 +16,7 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Status: Accepted
 - Context: The tool must ship on Linux x86-64 and ARM64 and be easy for ordinary users to build.
 - Decision: Use `modernc.org/sqlite`, a pure-Go driver, with `CGO_ENABLED=0`. Do not require a C toolchain. Enable WAL, foreign keys and a busy timeout.
-- Consequences: Cross-compilation is simple. The driver is an added dependency; it is recorded here as required by repository policy. No ORM is added.
+- Consequences: Cross-compilation is simple. The driver is an added dependency; it is recorded here as required by repository policy. No ORM is added. Migration `0001_init.sql` is the initial unreleased schema and may be refined in place during task 0003. After the first MVP release ships, migrations become append-only and must never be edited in place.
 
 ## ADR-0003 — Narō official API plus catalog, baseline first
 

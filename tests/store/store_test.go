@@ -350,7 +350,7 @@ func TestDeleteObservationRemovesOwnedData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.Queries().DeleteObservation(ctx, f.watch.ID); err != nil {
+	if err := s.DeleteObservation(ctx, f.watch.ID); err != nil {
 		t.Fatalf("delete observation: %v", err)
 	}
 	if _, err := s.Queries().GetWatch(ctx, f.watch.ID); !errors.Is(err, store.ErrNotFound) {
@@ -372,6 +372,65 @@ func TestDeleteObservationRemovesOwnedData(t *testing.T) {
 	events, err := s.Queries().ListEvents(ctx, store.EventFilter{PublicationID: f.publication.ID})
 	if err != nil || len(events) != 0 {
 		t.Fatalf("events remain: %+v err=%v", events, err)
+	}
+	deliveries, err := s.Queries().ListDeliveriesByEvent(ctx, event.ID)
+	if err != nil || len(deliveries) != 0 {
+		t.Fatalf("deliveries remain: %+v err=%v", deliveries, err)
+	}
+	runs, err := s.Queries().ListScanRunsByWatch(ctx, f.watch.ID, 10)
+	if err != nil || len(runs) != 0 {
+		t.Fatalf("scan runs remain: %+v err=%v", runs, err)
+	}
+}
+
+func TestDeleteObservationRetainsSharedWorkAndSource(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	f := createFixture(t, s, "N7000AA", true, time.Now().UTC())
+	now := time.Now().UTC().Truncate(time.Second)
+
+	pub2 := &domain.Publication{
+		ID: id.New("pub"), WorkID: f.work.ID, SourceID: f.source.ID,
+		Type: domain.PublicationLN, OriginalURL: "https://example.test/ln/N7000AA",
+		Status: domain.StatusUnknown, CreatedAt: now, UpdatedAt: now,
+	}
+	watch2 := &domain.Watch{
+		ID: id.New("watch"), PublicationID: pub2.ID, Enabled: true, IntervalSeconds: 86400,
+		Mode: domain.ModeCatalog, NextCheckAt: now, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := s.InTx(ctx, func(q *store.Queries) error {
+		if err := q.CreatePublication(ctx, pub2); err != nil {
+			return err
+		}
+		return q.CreateWatch(ctx, watch2)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.DeleteObservation(ctx, f.watch.ID); err != nil {
+		t.Fatalf("delete first observation: %v", err)
+	}
+	if _, err := s.Queries().GetWork(ctx, f.work.ID); err != nil {
+		t.Fatalf("shared work removed: %v", err)
+	}
+	if _, err := s.Queries().GetSource(ctx, f.source.ID); err != nil {
+		t.Fatalf("shared source removed: %v", err)
+	}
+	if _, err := s.Queries().GetPublication(ctx, pub2.ID); err != nil {
+		t.Fatalf("second publication removed: %v", err)
+	}
+	if _, err := s.Queries().GetWatch(ctx, watch2.ID); err != nil {
+		t.Fatalf("second watch removed: %v", err)
+	}
+
+	if err := s.DeleteObservation(ctx, watch2.ID); err != nil {
+		t.Fatalf("delete second observation: %v", err)
+	}
+	if _, err := s.Queries().GetWork(ctx, f.work.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unreferenced work remains: %v", err)
+	}
+	if _, err := s.Queries().GetSource(ctx, f.source.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unreferenced source remains: %v", err)
 	}
 }
 
@@ -445,6 +504,9 @@ func TestInvalidEnumsAndPayloadRejected(t *testing.T) {
 	}
 	if _, err := s.Queries().InsertDelivery(ctx, &domain.NotificationDelivery{ID: id.New("del"), EventID: "e", Channel: "telegram", Status: "bogus", NextAttemptAt: now, CreatedAt: now, UpdatedAt: now}); err == nil {
 		t.Fatal("invalid delivery status accepted")
+	}
+	if err := s.Queries().UpdateWatchSchedule(ctx, "missing", 0, now, now); err == nil {
+		t.Fatal("non-positive watch interval accepted")
 	}
 }
 

@@ -185,6 +185,9 @@ func (q *Queries) UpdateWatchBaseline(ctx context.Context, id string, establishe
 }
 
 func (q *Queries) UpdateWatchSchedule(ctx context.Context, id string, intervalSeconds int64, nextCheck time.Time, now time.Time) error {
+	if intervalSeconds <= 0 {
+		return fmt.Errorf("store: watch interval must be positive")
+	}
 	res, err := q.q.ExecContext(ctx,
 		`UPDATE watch SET interval_seconds = ?, next_check_at = ?, updated_at = ? WHERE id = ?`,
 		intervalSeconds, formatTime(nextCheck), formatTime(now), id,
@@ -210,7 +213,13 @@ func (q *Queries) SetWatchEnabled(ctx context.Context, id string, enabled bool, 
 // deliveries and scan runs in one transaction. Work and Source rows are removed
 // only when no other publication line references them. It is the storage side
 // of the user-facing remove command.
-func (q *Queries) DeleteObservation(ctx context.Context, watchID string) error {
+func (s *Store) DeleteObservation(ctx context.Context, watchID string) error {
+	return s.InTx(ctx, func(q *Queries) error {
+		return q.deleteObservation(ctx, watchID)
+	})
+}
+
+func (q *Queries) deleteObservation(ctx context.Context, watchID string) error {
 	var publicationID string
 	err := q.q.QueryRowContext(ctx,
 		`SELECT publication_id FROM watch WHERE id = ?`, watchID,

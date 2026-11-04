@@ -46,6 +46,12 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("store: create state directory: %w", err)
 	}
 
+	unlock, err := acquireFileLock(ctx, abs+".migrate.lock")
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
 	var lastErr error
 	for attempt := 0; attempt < 6; attempt++ {
 		s, err := openOnce(ctx, abs)
@@ -53,7 +59,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 			return s, nil
 		}
 		lastErr = err
-		if !isBusyError(err) {
+		if !isRetryableOpenError(err) {
 			return nil, err
 		}
 		select {
@@ -100,9 +106,12 @@ func openOnce(ctx context.Context, abs string) (*Store, error) {
 	return s, nil
 }
 
-func isBusyError(err error) bool {
+func isRetryableOpenError(err error) bool {
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "locked") || strings.Contains(msg, "busy")
+	return strings.Contains(msg, "locked") ||
+		strings.Contains(msg, "busy") ||
+		strings.Contains(msg, "already exists") ||
+		strings.Contains(msg, "unique constraint")
 }
 
 func (s *Store) Close() error { return s.db.Close() }
