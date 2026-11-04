@@ -1,6 +1,6 @@
 # Task 0002 - Foundation: repository docs, Go bootstrap, hooks and build
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
