@@ -32,6 +32,7 @@ Implement the official Narō API end semantics (0=completed/short story, 1=ongoi
 - tests/app/app_test.go
 - docs/integration-contract.md
 - docs/architecture.md
+- docs/domain-model.md
 - docs/decisions.md
 - docs/progress.md
 - README.md
@@ -83,14 +84,17 @@ Implement the official Narō API end semantics (0=completed/short story, 1=ongoi
 ## Verification
 
 - `{"id":"push-checks","type":"automated","required":true,"environment":"local","profile":"deterministic","command":"scripts/verify-push.sh","evidenceRef":"local scripts/verify-push.sh run"}`
+- `{"id":"pre-fix-observation","type":"manual","required":true,"environment":"local","profile":"trusted","instruction":"Record the baseline inverted end mapping and the live N2166FE end=1 observation.","evidenceRef":"baseline c172aad end mapping and live Narō API observation"}`
 
 ## Documentation updates
 
 - docs/integration-contract.md
 - docs/architecture.md
+- docs/domain-model.md
 - docs/decisions.md
 - docs/progress.md
 
 ## Notes
 
 - Official spec: https://dev.syosetu.com/man/api/ . Do not infer completion from last update time. Do not disable watches on completed.
+- Pre-fix observation at baseline `c172aad376c63dcbe914ddeca6cb0d2ecde70ac4`: `internal/source/naro.go` mapped `end=1` to `completed` and only `end=0`/other values to `ongoing`; `tests/source/naro_test.go` asserted `completed` for the `end=1` fixture. A polite live request to `https://api.syosetu.com/novelapi/api/?out=json&ncode=N2166FE` returned `end=1`, `general_all_no=210`, and `general_lastup=2023-08-01 22:25:09`, proving the baseline misreported the work as completed. Reproduction limits: one live API request, no catalog crawl, network required for the live observation; the baseline code and old test assertion are visible in the baseline diff.
