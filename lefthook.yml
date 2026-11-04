@@ -1,0 +1,13 @@
+pre-commit:
+  commands:
+    gofmt:
+      glob: "*.go"
+      run: gofmt -w {staged_files}
+      stage_fixed: true
+    verify-fast:
+      run: scripts/verify-fast.sh
+
+pre-push:
+  commands:
+    verify-push:
+      run: scripts/verify-push.sh

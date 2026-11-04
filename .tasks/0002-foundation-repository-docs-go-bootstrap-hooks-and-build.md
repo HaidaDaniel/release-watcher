@@ -1,7 +1,7 @@
 # Task 0002 - Foundation: repository docs, Go bootstrap, hooks and build
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Scope: docs,build,tooling,cli
@@ -37,6 +37,8 @@ Establish the repository foundation for Release Watcher: accurate product and ar
 - deploy/systemd/**
 - lefthook.yml
 - .gitignore
+- package.json
+- pnpm-lock.yaml
 - docs/project.md
 - docs/scope.md
 - docs/architecture.md
