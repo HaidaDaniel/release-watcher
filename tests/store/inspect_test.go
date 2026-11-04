@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -97,10 +98,10 @@ func TestInspectSchemaWithLiveWALDoesNotModifySourceSidecars(t *testing.T) {
 	if err := st.Queries().SetSetting(ctx, "k", "v", time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	before := map[string]os.FileInfo{}
+	before := map[string][]byte{}
 	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
-		if info, err := os.Stat(candidate); err == nil {
-			before[candidate] = info
+		if data, err := os.ReadFile(candidate); err == nil {
+			before[candidate] = data
 		}
 	}
 	version, err := store.InspectSchema(ctx, path)
@@ -108,12 +109,12 @@ func TestInspectSchemaWithLiveWALDoesNotModifySourceSidecars(t *testing.T) {
 		t.Fatalf("inspect live = %d err=%v", version, err)
 	}
 	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {
-		if info, err := os.Stat(candidate); err == nil {
-			if old, ok := before[candidate]; !ok || old.Size() != info.Size() {
-				t.Fatalf("source sidecar changed by inspect: %s", candidate)
+		if data, err := os.ReadFile(candidate); err == nil {
+			if old, ok := before[candidate]; !ok || !bytes.Equal(old, data) {
+				t.Fatalf("source file changed by inspect: %s", candidate)
 			}
 		} else if _, ok := before[candidate]; ok {
-			t.Fatalf("source sidecar removed by inspect: %s", candidate)
+			t.Fatalf("source file removed by inspect: %s", candidate)
 		}
 	}
 }

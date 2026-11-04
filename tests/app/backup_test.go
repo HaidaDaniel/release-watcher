@@ -334,3 +334,34 @@ func TestRestoreCleansSidecarsAndOldDatabase(t *testing.T) {
 		t.Fatalf("database unreadable after restore: %+v", appErr)
 	}
 }
+
+func TestBackupRejectsSymlinkedAndHardlinkedLiveTargets(t *testing.T) {
+	n := newNaroFixture(t, []string{"One"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	_ = addNaro(t, env, nil)
+
+	for _, suffix := range []string{"-shm", "-journal"} {
+		if _, appErr := env.svc.Backup(ctx, env.cfg.DBPath+suffix, true); appErr == nil || appErr.Code != "invalid_argument" {
+			t.Fatalf("sidecar target %s = %+v", suffix, appErr)
+		}
+	}
+	linkDir := filepath.Join(t.TempDir(), "linked-state")
+	if err := os.Symlink(filepath.Dir(env.cfg.DBPath), linkDir); err != nil {
+		t.Fatal(err)
+	}
+	symlinkTarget := filepath.Join(linkDir, filepath.Base(env.cfg.DBPath))
+	if _, appErr := env.svc.Backup(ctx, symlinkTarget, true); appErr == nil || appErr.Code != "invalid_argument" {
+		t.Fatalf("symlinked parent target = %+v", appErr)
+	}
+	hardlink := filepath.Join(t.TempDir(), "hardlink.db")
+	if err := os.Link(env.cfg.DBPath, hardlink); err != nil {
+		t.Fatal(err)
+	}
+	if _, appErr := env.svc.Backup(ctx, hardlink, true); appErr == nil || appErr.Code != "invalid_argument" {
+		t.Fatalf("hardlink target = %+v", appErr)
+	}
+	if _, appErr := env.svc.List(ctx); appErr != nil {
+		t.Fatalf("database damaged: %+v", appErr)
+	}
+}
