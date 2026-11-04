@@ -1,6 +1,6 @@
 # Task 0007 - Installation: backup/restore, full doctor, systemd and Whoosh assessment
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
