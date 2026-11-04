@@ -1,7 +1,7 @@
 # Task 0017 - Calendar-aware daily scheduling without skipped runs
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Type: bugfix
