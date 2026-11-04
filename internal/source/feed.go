@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -96,14 +97,14 @@ func (a *FeedAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 		snapshot.SourceKind = domain.SourceRSS
 		snapshot.Metadata.OriginalTitle = strings.TrimSpace(root.Channel.Title)
 		items := append(append([]rssItem{}, root.Channel.Items...), root.Items...)
-		for _, item := range items {
-			releases = append(releases, rssRelease(item))
+		for i, item := range items {
+			releases = append(releases, rssRelease(item, i))
 		}
 	case root.XMLName.Local == "feed" || len(root.Entries) > 0:
 		snapshot.SourceKind = domain.SourceAtom
 		snapshot.Metadata.OriginalTitle = strings.TrimSpace(root.Title)
-		for _, entry := range root.Entries {
-			releases = append(releases, atomRelease(entry))
+		for i, entry := range root.Entries {
+			releases = append(releases, atomRelease(entry, i))
 		}
 	default:
 		return nil, &Error{Code: CodeUnsupportedSource, Message: "URL is not an RSS or Atom feed"}
@@ -129,11 +130,11 @@ func (a *FeedAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 	return snapshot, nil
 }
 
-func rssRelease(item rssItem) Release {
+func rssRelease(item rssItem, index int) Release {
 	id := firstNonEmpty(item.GUID, item.Link)
 	published := parseFeedTime(firstNonEmpty(item.PubDate, item.Date, item.Updated))
 	if id == "" {
-		id = fallbackEntryID(item.Title, published)
+		id = fallbackEntryID(item.Title, published, index)
 	}
 	var link *string
 	if item.Link != "" {
@@ -150,12 +151,12 @@ func rssRelease(item rssItem) Release {
 	}
 }
 
-func atomRelease(entry atomEntry) Release {
+func atomRelease(entry atomEntry, index int) Release {
 	link := alternateLink(entry.Links)
 	id := firstNonEmpty(entry.ID, link)
 	published := parseFeedTime(firstNonEmpty(entry.Published, entry.Updated))
 	if id == "" {
-		id = fallbackEntryID(entry.Title, published)
+		id = fallbackEntryID(entry.Title, published, index)
 	}
 	return Release{
 		ExternalID:  strings.TrimSpace(id),
@@ -184,11 +185,12 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func fallbackEntryID(title string, published *time.Time) string {
+func fallbackEntryID(title string, published *time.Time, index int) string {
 	base := strings.TrimSpace(title)
 	if published != nil {
 		base += "|" + published.UTC().Format(time.RFC3339)
 	}
+	base += "|" + fmt.Sprintf("%d", index)
 	sum := sha256.Sum256([]byte(base))
 	return "entry:" + hex.EncodeToString(sum[:])
 }

@@ -146,3 +146,33 @@ func TestRegistryRejectsKindMismatch(t *testing.T) {
 		t.Fatalf("err = %#v", err)
 	}
 }
+
+func TestFeedFallbackIDsAreDistinct(t *testing.T) {
+	payload := []byte(`<?xml version="1.0"?><rss version="2.0"><channel><title>No IDs</title><item><title>Same</title></item><item><title>Same</title></item></channel></rss>`)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(payload)
+	}))
+	defer server.Close()
+	got, err := source.NewFeed(testClient()).Fetch(context.Background(), server.URL+"/feed.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Releases) != 2 || got.Releases[0].ExternalID == got.Releases[1].ExternalID {
+		t.Fatalf("fallback ids = %q / %q", got.Releases[0].ExternalID, got.Releases[1].ExternalID)
+	}
+}
+
+func TestAtomSelfLinkIsNotUsedAsReleaseURL(t *testing.T) {
+	payload := []byte(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Self only</title><entry><id>one</id><title>One</title><link rel="self" href="https://example.test/self"/></entry></feed>`)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(payload)
+	}))
+	defer server.Close()
+	got, err := source.NewFeed(testClient()).Fetch(context.Background(), server.URL+"/atom.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Releases) != 1 || got.Releases[0].URL != nil {
+		t.Fatalf("release = %+v", got.Releases)
+	}
+}

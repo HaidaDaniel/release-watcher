@@ -281,3 +281,56 @@ func TestNaroMissingCountDoesNotUseAllCount(t *testing.T) {
 		t.Fatalf("mode=%q count=%d, want count_only/0", got.Mode, got.Count)
 	}
 }
+
+func TestNaroEmptyFirstPageIsNotComplete(t *testing.T) {
+	api := fixture(t, "naro_api.json")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/novelapi/api/" {
+			_, _ = w.Write(api)
+			return
+		}
+		_, _ = w.Write([]byte(`<div class="p-eplist"></div>`))
+	}))
+	defer server.Close()
+
+	adapter := source.NewNaro(testClient())
+	adapter.APIBase = server.URL + "/novelapi/api/"
+	adapter.CatalogBase = server.URL + "/"
+	got, err := adapter.Fetch(context.Background(), "https://ncode.syosetu.com/n2166fe/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Complete {
+		t.Fatal("empty first page marked complete")
+	}
+	if got.Mode != domain.ModeCountOnly || len(got.Releases) != 0 || len(got.Warnings) == 0 {
+		t.Fatalf("mode=%q releases=%d warnings=%v", got.Mode, len(got.Releases), got.Warnings)
+	}
+}
+
+func TestNaroExactPageBoundary404IsExhaustion(t *testing.T) {
+	api := strings.Replace(string(fixture(t, "naro_api.json")), `"general_all_no":3`, `"general_all_no":100`, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/novelapi/api/" {
+			_, _ = w.Write([]byte(api))
+			return
+		}
+		if r.URL.Query().Get("p") == "1" {
+			_, _ = w.Write([]byte(catalogHTML(1, 100)))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	adapter := source.NewNaro(testClient())
+	adapter.APIBase = server.URL + "/novelapi/api/"
+	adapter.CatalogBase = server.URL + "/"
+	got, err := adapter.Fetch(context.Background(), "https://ncode.syosetu.com/n2166fe/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Complete || len(got.Releases) != 100 || got.Count != 100 {
+		t.Fatalf("complete=%v releases=%d count=%d", got.Complete, len(got.Releases), got.Count)
+	}
+}

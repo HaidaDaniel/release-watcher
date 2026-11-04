@@ -148,7 +148,13 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 		pageURL := fmt.Sprintf("%s%s/?p=%d", strings.TrimRight(a.CatalogBase, "/")+"/", strings.ToLower(ncode), page)
 		pageResp, err := a.Client.Get(ctx, pageURL)
 		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("catalog page %d unavailable: %s", page, mapHTTPError(err).Message))
+			mapped := mapHTTPError(err)
+			if page > 1 && mapped.Code == CodeNotFound && knownCount && int64(len(releases)) >= int64(chapterCount) {
+				exhausted = true
+				warnings = append(warnings, fmt.Sprintf("catalog page %d returned 404 after the known count; treated as exhaustion", page))
+				break
+			}
+			warnings = append(warnings, fmt.Sprintf("catalog page %d unavailable: %s", page, mapped.Message))
 			break
 		}
 		pageReleases, parseErr := parseNaroCatalog(pageResp.Body, ncode)
@@ -157,11 +163,12 @@ func (a *NaroAdapter) Fetch(ctx context.Context, rawURL string) (*Snapshot, erro
 			break
 		}
 		if len(pageReleases) == 0 {
-			exhausted = true
-			if page == 1 && knownCount && chapterCount > 0 {
+			if page == 1 {
 				exhausted = false
-				warnings = append(warnings, "catalog page 1 contained no chapters")
+				warnings = append(warnings, "catalog page 1 contained no chapters; completeness is unknown")
+				break
 			}
+			exhausted = true
 			break
 		}
 		base := strings.TrimRight(a.CatalogBase, "/") + "/" + strings.ToLower(ncode) + "/"
