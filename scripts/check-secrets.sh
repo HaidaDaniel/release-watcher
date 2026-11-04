@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Guard against accidentally adding credentials to staged/working/untracked
+# files. This is not a full Git-history scanner; committed history requires a
+# separate audit if a leak is suspected.
 set -Eeuo pipefail
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo"
@@ -8,16 +11,23 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
   exit 0
 fi
 
-if git diff --cached --quiet -- . 2>/dev/null; then
-  diff_args=(--no-ext-diff --unified=0)
-  target="working tree"
-else
-  diff_args=(--cached --no-ext-diff --unified=0)
-  target="staged changes"
-fi
+added=""
+collect_diff() {
+  local diff_args=("$@")
+  added+=$'\n'
+  added+=$(git diff "${diff_args[@]}" --no-ext-diff --unified=0 -- . | grep -E '^\+' | grep -Ev '^\+\+\+' || true)
+}
 
-added=$(git diff "${diff_args[@]}" -- . | grep -E '^\+' | grep -Ev '^\+\+\+' || true)
-if [[ -z "$added" ]]; then
+collect_diff --cached
+collect_diff
+
+while IFS= read -r -d '' file; do
+  [[ -f "$file" ]] || continue
+  added+=$'\n'
+  added+=$(grep -IEn '' -- "$file" 2>/dev/null || true)
+done < <(git ls-files --others --exclude-standard -z)
+
+if [[ -z "${added//[$'\n\r\t ']/}" ]]; then
   exit 0
 fi
 
@@ -33,7 +43,7 @@ patterns=(
 found=0
 for pattern in "${patterns[@]}"; do
   if matches=$(printf '%s\n' "$added" | grep -En "$pattern" || true); [[ -n "$matches" ]]; then
-    echo "check-secrets: possible secret in $target:" >&2
+    echo "check-secrets: possible secret in staged/working/untracked changes:" >&2
     printf '%s\n' "$matches" >&2
     found=1
   fi

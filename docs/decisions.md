@@ -57,7 +57,7 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 
 - Date: 2026-11-04
 - Status: Accepted
-- Decision: Lefthook provides a fast pre-commit (gofmt on staged Go files, secret scan, repository/build sanity) and a fuller pre-push (`go test ./...`, `go vet ./...`, `go build ./...`, APK lint). `go test -race` is an explicit extended check, enabled in pre-push only when its cost is acceptable. No `.github/workflows` exists before MVP acceptance.
+- Decision: Lefthook provides a fast pre-commit (gofmt on staged Go files, secret scan, repository/build sanity) and a fuller pre-push (`go test ./...`, `go vet ./...`, `go build ./...`, APK lint). `go test -race` is an explicit extended check, enabled in pre-push only when its cost is acceptable. The secret scan covers staged, working-tree and untracked additions; it is an accident guard, not a full Git-history audit. No `.github/workflows` exists before MVP acceptance.
 - Consequences: Verification stays local and runnable. CI can be added later as a mirror of the same commands, not as a new source of truth.
 
 ## ADR-0009 — AgenticProjectKit is a development tool, not a runtime dependency
@@ -78,8 +78,8 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 
 - Date: 2026-11-04
 - Status: Accepted
-- Decision: Human CLI text and notification templates default to Russian with English selectable. Machine JSON field names stay stable English. `original_title` is always stored. `title_ru`/`title_en` may be supplied at add time and are reused; missing translations fall back to the original. Translation is an optional add-time integration, never a scan dependency.
-- Consequences: No hidden LLM call and no per-scan translation.
+- Decision: Human help text and notification templates default to Russian with English selectable. Machine JSON field names stay stable English. `original_title` is always stored. `title_ru`/`title_en` may be supplied at add time and are reused; missing translations fall back to the original. Translation is an optional add-time integration, never a scan dependency. In the foundation, `version`/`doctor` human diagnostic strings remain English; full CLI localization lands with the product commands in task 0005 and notification localization in task 0006.
+- Consequences: No hidden LLM call and no per-scan translation. Documentation does not claim that every foundation diagnostic string is localized yet.
 
 ## ADR-0012 — Minimal dependency set
 

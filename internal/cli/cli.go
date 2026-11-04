@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -155,7 +156,6 @@ func (r *runner) version() int {
 }
 
 func (r *runner) doctor(ctx context.Context) int {
-	_ = ctx
 	cfg, err := config.Load(r.getenv)
 	if err != nil {
 		return r.fail(&commandError{code: "config_error", message: err.Error(), exit: ExitError})
@@ -212,13 +212,23 @@ func (r *runner) doctor(ctx context.Context) int {
 		add("build_identity", "ok", "build identity is valid")
 	}
 
-	if _, statErr := os.Stat(filepath.Join(".git", "hooks", "pre-commit")); statErr == nil {
+	root := gitOutput(ctx, "rev-parse", "--show-toplevel")
+	if root == "" {
+		root, _ = os.Getwd()
+	}
+	hookPath := gitOutput(ctx, "rev-parse", "--git-path", "hooks/pre-commit")
+	if hookPath == "" {
+		hookPath = filepath.Join(root, ".git", "hooks", "pre-commit")
+	} else if !filepath.IsAbs(hookPath) {
+		hookPath = filepath.Join(root, hookPath)
+	}
+	if _, statErr := os.Stat(hookPath); statErr == nil {
 		add("hooks", "ok", "pre-commit hook is installed")
 	} else {
 		add("hooks", "warn", "pre-commit hook is not installed; run pnpm exec lefthook install")
 	}
 
-	if _, statErr := os.Stat(filepath.Join(".github", "workflows")); statErr == nil {
+	if _, statErr := os.Stat(filepath.Join(root, ".github", "workflows")); statErr == nil {
 		add("ci", "warn", "GitHub Actions is present before MVP acceptance; local hooks are the intended path")
 	} else {
 		add("ci", "ok", "no GitHub Actions workflow (intentional before MVP)")
@@ -249,6 +259,15 @@ func (r *runner) doctor(ctx context.Context) int {
 		return ExitError
 	}
 	return ExitOK
+}
+
+func gitOutput(ctx context.Context, args ...string) string {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func (r *runner) writeJSON(v any) {

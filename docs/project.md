@@ -47,7 +47,8 @@ release-watcher scan --due
 | RSS/Atom adapter | planned |
 | `add`, `list`, `show`, `scan`, `events`, pause/resume/interval/remove | planned |
 | Telegram outbox and retries | planned |
-| Backup/restore and doctor | planned |
+| Doctor (foundation config/environment checks) | implemented |
+| Backup/restore | planned |
 | systemd timer installation proof | planned |
 | Whoosh Core deployment spike | planned, not executed |
 | Media Core documentation | separate repository |

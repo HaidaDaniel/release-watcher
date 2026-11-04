@@ -24,8 +24,9 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Tested
 
-- Foundation CLI JSON and build identity tests: see task 0002 evidence.
+- Foundation CLI JSON, help localization and build identity tests: see task 0002 evidence.
 - `scripts/verify-push.sh` runs gofmt, secret scan, `go test ./...`, `go vet ./...`, `go build ./...` and APK lint.
+- No adapter, fixture or live Narō test exists yet; those tests belong to tasks 0004–0005.
 
 ## Deployed
 
@@ -34,7 +35,8 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 ## Blocked
 
 - Whoosh Core live deployment: no test host and no MVP candidate yet. Planned after task 0007.
-- Real Narō behavior beyond a single polite live smoke test: fixtures are used for deterministic tests; the live smoke is not mass polling.
+- Fixture-based adapter and detection tests plus a single polite live Narō smoke test: blocked until the adapter tasks implement them.
+- Real Narō behavior is not yet verified; no live smoke test has been run.
 
 ## Next step
 

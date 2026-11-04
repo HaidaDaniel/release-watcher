@@ -8,6 +8,7 @@ usage() {
 usage: scripts/build.sh [--os linux] [--arch amd64|arm64] [--all]
                         [--out-dir bin] [--version V] [--commit SHA]
                         [--built-at RFC3339] [--mode development|release]
+                        [--allow-dirty]
 EOF
   exit 2
 }
@@ -20,6 +21,7 @@ version=0.1.0-dev
 commit=""
 built_at=""
 mode=development
+allow_dirty=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -31,6 +33,7 @@ while [[ $# -gt 0 ]]; do
     --commit) commit=$2; shift 2 ;;
     --built-at) built_at=$2; shift 2 ;;
     --mode) mode=$2; shift 2 ;;
+    --allow-dirty) allow_dirty=true; shift ;;
     *) usage ;;
   esac
 done
@@ -46,13 +49,29 @@ if [[ -z "$built_at" ]]; then
 fi
 
 if [[ "$mode" == release ]]; then
+  case "$version" in
+    *-dev)
+      echo "build: release mode requires an explicit non-dev version" >&2
+      exit 1
+      ;;
+  esac
   if ! [[ "$commit" =~ ^[0-9a-f]{40}$ ]]; then
     echo "build: release mode requires a full 40-character commit SHA" >&2
     exit 1
   fi
-  if ! date -u -d "$built_at" +%Y-%m-%dT%H:%M:%SZ >/dev/null 2>&1; then
-    echo "build: release mode requires an RFC3339 built_at" >&2
+  if ! [[ "$built_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$ ]]; then
+    echo "build: release mode requires an RFC3339 built_at (for example 2026-11-04T12:00:00Z)" >&2
     exit 1
+  fi
+  if ! date -u -d "$built_at" +%s >/dev/null 2>&1; then
+    echo "build: cannot parse built_at as a real RFC3339 timestamp" >&2
+    exit 1
+  fi
+  if ! $allow_dirty; then
+    if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+      echo "build: release mode requires a clean tree; commit changes or pass --allow-dirty for a local diagnostic build" >&2
+      exit 1
+    fi
   fi
 fi
 
