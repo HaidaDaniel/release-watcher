@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Web Novel</title>
+    <link>https://example.test/novel</link>
+    <description>Fixture feed</description>
+    <item>
+      <title>Chapter 10: The Return</title>
+      <link>https://example.test/novel/10</link>
+      <guid isPermaLink="false">example-chapter-10</guid>
+      <pubDate>Mon, 04 Nov 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Chapter 11: Morning</title>
+      <link>https://example.test/novel/11</link>
+      <pubDate>Tue, 05 Nov 2026 09:30:00 +0900</pubDate>
+    </item>
+  </channel>
+</rss>

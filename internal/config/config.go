@@ -33,6 +33,9 @@ type Config struct {
 	AllowPrivateHosts bool
 	MaxDeliveryTries  int
 	MaxRedirects      int
+	RateInterval      time.Duration
+	MaxRetries        int
+	MaxBodyBytes      int64
 }
 
 // Load resolves configuration from environment variables using getenv.
@@ -114,6 +117,30 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 	}
 
+	rateInterval := time.Second
+	if raw := strings.TrimSpace(getenv("RELEASE_WATCHER_RATE_INTERVAL")); raw != "" {
+		rateInterval, err = time.ParseDuration(raw)
+		if err != nil || rateInterval < 0 || rateInterval > time.Minute {
+			return Config{}, fmt.Errorf("RELEASE_WATCHER_RATE_INTERVAL must be a duration between 0s and 1m")
+		}
+	}
+
+	maxRetries := 3
+	if raw := strings.TrimSpace(getenv("RELEASE_WATCHER_MAX_RETRIES")); raw != "" {
+		maxRetries, err = strconv.Atoi(raw)
+		if err != nil || maxRetries < 0 || maxRetries > 10 {
+			return Config{}, fmt.Errorf("RELEASE_WATCHER_MAX_RETRIES must be between 0 and 10")
+		}
+	}
+
+	maxBodyBytes := int64(4 << 20)
+	if raw := strings.TrimSpace(getenv("RELEASE_WATCHER_MAX_BODY_BYTES")); raw != "" {
+		maxBodyBytes, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || maxBodyBytes < 64<<10 || maxBodyBytes > 16<<20 {
+			return Config{}, fmt.Errorf("RELEASE_WATCHER_MAX_BODY_BYTES must be between 65536 and 16777216")
+		}
+	}
+
 	telegramAPIBase := strings.TrimSpace(getenv("RELEASE_WATCHER_TELEGRAM_API_BASE"))
 	if telegramAPIBase == "" {
 		telegramAPIBase = "https://api.telegram.org"
@@ -143,6 +170,9 @@ func Load(getenv func(string) string) (Config, error) {
 		AllowPrivateHosts: allowPrivate,
 		MaxDeliveryTries:  maxTries,
 		MaxRedirects:      maxRedirects,
+		RateInterval:      rateInterval,
+		MaxRetries:        maxRetries,
+		MaxBodyBytes:      maxBodyBytes,
 	}, nil
 }
 

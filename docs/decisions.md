@@ -50,7 +50,7 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 
 - Date: 2026-11-04
 - Status: Accepted
-- Decision: All adapter HTTP traffic goes through a shared client that only allows `http`/`https`, limits redirects, applies timeouts and retries 429/5xx with backoff. A custom dialer resolves the host and rejects loopback, private, link-local, CGNAT, multicast and unspecified addresses at dial time, which also covers redirects and DNS rebinding. Per-host pacing is enforced. An explicit test/dev setting may allow private hosts; it is off by default.
+- Decision: All adapter HTTP traffic goes through a shared client that only allows `http`/`https`, limits redirects, applies timeouts, bounds response bodies, paces requests per host and retries 429/5xx with backoff. A custom dialer resolves the host and rejects loopback, private, link-local, CGNAT, multicast, benchmarking, reserved and unspecified addresses at dial time, which also covers redirects and DNS rebinding. Environment HTTP proxies are disabled so a proxy cannot bypass the address check. An explicit test/dev setting may allow private hosts; it is off by default.
 - Consequences: Tests use local HTTP servers with the explicit setting. No CAPTCHA, login or paywall bypass exists.
 
 ## ADR-0008 — Local hooks and APK; no CI until a working MVP

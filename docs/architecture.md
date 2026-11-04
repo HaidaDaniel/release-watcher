@@ -1,6 +1,6 @@
 # Architecture
 
-Status: the repository, CLI bootstrap and SQLite persistence (schema and repositories) are implemented. Adapters, scanning, notifications and deployment proof are planned. The target shape below is intentionally small.
+Status: the repository, CLI bootstrap, SQLite persistence and normalized Narō/RSS/Atom adapters with an SSRF-safe HTTP client are implemented. Scanning, notifications and deployment proof are planned. The target shape below is intentionally small.
 
 ## Shape
 
@@ -60,7 +60,7 @@ An adapter reports applicability, fetches metadata plus releases, normalizes ide
 ## Security and robustness
 
 - The HTTP client only permits `http`/`https`, limits redirects, applies timeouts and retries 429/5xx with backoff.
-- SSRF protection rejects loopback, private, link-local, CGNAT, multicast and unspecified addresses at dial time, including redirect targets. Tests and explicit local feeds can enable private hosts only through configuration.
+- SSRF protection rejects loopback, private, link-local, CGNAT, multicast and unspecified addresses at dial time, including redirect targets and DNS rebinding. The client does not use environment HTTP proxies, so a proxy cannot bypass the address check. Tests and explicit local feeds can enable private hosts only through configuration.
 - Per-host request pacing is enforced. No CAPTCHA, login or paywall bypass exists.
 - Secrets (Telegram token) come from the environment, are never logged, and are not stored in SQLite.
 - Logs are text by default and JSON when requested. Event and CLI JSON contracts have stable field names and schema versions.

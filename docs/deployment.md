@@ -50,6 +50,9 @@ Environment variables are read at process start. Put secrets only in a protected
 | `RELEASE_WATCHER_DB` | `<state>/release-watcher.db` | SQLite path |
 | `RELEASE_WATCHER_DEFAULT_INTERVAL` | `24h` | default watch interval |
 | `RELEASE_WATCHER_HTTP_TIMEOUT` | `30s` | per-request timeout |
+| `RELEASE_WATCHER_RATE_INTERVAL` | `1s` | minimum delay between requests to one host |
+| `RELEASE_WATCHER_MAX_RETRIES` | `3` | retries for timeouts and 429/5xx |
+| `RELEASE_WATCHER_MAX_BODY_BYTES` | `4194304` | maximum response body (64 KiB–16 MiB) |
 | `RELEASE_WATCHER_LANG` | `ru` | human/notification language (`ru`/`en`) |
 | `RELEASE_WATCHER_LOG_FORMAT` | `text` | `text` or `json` |
 | `RELEASE_WATCHER_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |

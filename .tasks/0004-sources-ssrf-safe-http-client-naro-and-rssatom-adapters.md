@@ -1,7 +1,7 @@
 # Task 0004 - Sources: SSRF-safe HTTP client, Naro and RSS/Atom adapters
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Scope: source,http,security,docs
@@ -34,6 +34,7 @@ Implement a shared HTTP client with timeout, retry, pacing and SSRF protection, 
 - docs/decisions.md
 - docs/progress.md
 - docs/domain-model.md
+- docs/deployment.md
 
 ## Files forbidden to edit
 
