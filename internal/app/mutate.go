@@ -13,6 +13,9 @@ func (s *Service) Pause(ctx context.Context, watchID string) (*WatchView, *Error
 	if err != nil {
 		return nil, mapError(err)
 	}
+	if watch.RemovedAt != nil {
+		return nil, newError("invalid_argument", "watch is removed; re-add the URL to restore it", nil)
+	}
 	now := s.now()
 	if !watch.Enabled && watch.PausedAt != nil {
 		b, loadErr := s.loadBundle(ctx, q, watchID)
@@ -39,6 +42,9 @@ func (s *Service) Resume(ctx context.Context, watchID string) (*WatchView, *Erro
 		watch, err := q.GetWatch(ctx, watchID)
 		if err != nil {
 			return err
+		}
+		if watch.RemovedAt != nil {
+			return newError("invalid_argument", "watch is removed; re-add the URL to restore it", nil)
 		}
 		if watch.Enabled && watch.PausedAt == nil {
 			return nil
@@ -73,6 +79,9 @@ func (s *Service) SetInterval(ctx context.Context, watchID string, interval time
 		if err != nil {
 			return err
 		}
+		if watch.RemovedAt != nil {
+			return newError("invalid_argument", "watch is removed; re-add the URL to restore it", nil)
+		}
 		if err := q.UpdateWatchSchedule(ctx, watchID, int64(interval/time.Second), nextCheck, now); err != nil {
 			return err
 		}
@@ -95,8 +104,22 @@ func (s *Service) Remove(ctx context.Context, watchID string) (*RemoveResult, *E
 	if err != nil {
 		return nil, mapError(err)
 	}
+	if watch.RemovedAt == nil {
+		if err := q.MarkWatchRemoved(ctx, watchID, s.now()); err != nil {
+			return nil, mapError(err)
+		}
+	}
+	return &RemoveResult{Removed: true, HistoryPreserved: true, WatchID: watchID, PublicationID: watch.PublicationID}, nil
+}
+
+func (s *Service) Purge(ctx context.Context, watchID string) (*PurgeResult, *Error) {
+	q := s.store.Queries()
+	watch, err := q.GetWatch(ctx, watchID)
+	if err != nil {
+		return nil, mapError(err)
+	}
 	if err := s.store.DeleteObservation(ctx, watchID); err != nil {
 		return nil, mapError(err)
 	}
-	return &RemoveResult{Removed: true, WatchID: watchID, PublicationID: watch.PublicationID}, nil
+	return &PurgeResult{Purged: true, WatchID: watchID, PublicationID: watch.PublicationID}, nil
 }

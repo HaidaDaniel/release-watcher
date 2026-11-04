@@ -194,6 +194,7 @@ type Watch struct {
 	LastErrorCategory     string
 	ConsecutiveFailures   int
 	PausedAt              *time.Time
+	RemovedAt             *time.Time
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }

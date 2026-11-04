@@ -27,7 +27,7 @@ func TestBackupRestoreRoundTrip(t *testing.T) {
 	if appErr != nil {
 		t.Fatal(appErr)
 	}
-	if backup.SchemaVersion != 1 || backup.Bytes <= 0 {
+	if backup.SchemaVersion != 2 || backup.Bytes <= 0 {
 		t.Fatalf("backup = %+v", backup)
 	}
 	zr, err := zip.OpenReader(backupPath)
@@ -57,7 +57,7 @@ func TestBackupRestoreRoundTrip(t *testing.T) {
 	if appErr != nil {
 		t.Fatal(appErr)
 	}
-	if restored.SchemaVersion != 1 || restored.Bytes <= 0 {
+	if restored.SchemaVersion != 2 || restored.Bytes <= 0 {
 		t.Fatalf("restore = %+v", restored)
 	}
 

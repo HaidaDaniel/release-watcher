@@ -149,6 +149,7 @@ func (s *Service) watchView(b *bundle) WatchView {
 		LastCheckedAt:   b.watch.LastCheckAt,
 		LastSuccessAt:   b.watch.LastSuccessAt,
 		NextCheckAt:     b.watch.NextCheckAt,
+		RemovedAt:       b.watch.RemovedAt,
 		ReleaseCount:    b.publication.ReleaseCount,
 		Mode:            string(b.watch.Mode),
 	}

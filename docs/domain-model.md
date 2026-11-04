@@ -86,10 +86,11 @@ A specific observation of a Publication.
 | `last_success_at` | last successful fetch/compare |
 | `last_error_category` | bounded error category, no secrets |
 | `consecutive_failures` | retry/health signal |
-| `paused_at` | nullable |
+| `paused_at` | nullable; set while paused |
+| `removed_at` | nullable; set when the user stops watching while history is preserved |
 | `created_at`, `updated_at` | local timestamps |
 
-Pause/resume changes only scheduling. Removing a watch deletes the observation, its publication line, releases, events, deliveries and scan runs in one transaction. The Work and Source rows are removed only when no other publication line still references them. Removing one watch never silently modifies another publication line.
+Pause/resume changes only scheduling. `remove`/unwatch sets `removed_at`, disables scheduling and preserves the publication line, releases, events, deliveries and scan runs; event ids stay stable and history export keeps working. Re-adding the same URL restores the same watch and does not duplicate releases or replay already-known chapters. `purge` is the explicit destructive operation: it deletes the observation, its publication line, releases, events, deliveries and scan runs in one transaction. Work and Source rows are removed only when no other publication line still references them. Neither operation silently modifies another publication line.
 
 ## Release
 

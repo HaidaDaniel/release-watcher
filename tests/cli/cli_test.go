@@ -194,7 +194,11 @@ func TestCLIJSONVerticalSlice(t *testing.T) {
 	}
 
 	code, stdout, _ = runCLI(t, env, "remove", watchID, "--yes", "--json")
-	if code != 0 || dataMap(t, decodeEnvelope(t, stdout))["removed"] != true {
+	if code != 0 {
+		t.Fatalf("remove = %s", stdout)
+	}
+	removeData := dataMap(t, decodeEnvelope(t, stdout))
+	if removeData["removed"] != true || removeData["history_preserved"] != true {
 		t.Fatalf("remove = %s", stdout)
 	}
 	code, stdout, _ = runCLI(t, env, "list", "--json")
@@ -202,8 +206,16 @@ func TestCLIJSONVerticalSlice(t *testing.T) {
 		t.Fatalf("list after remove = %s", stdout)
 	}
 	code, stdout, _ = runCLI(t, env, "events", "--json")
-	if code != 0 || len(dataMap(t, decodeEnvelope(t, stdout))["events"].([]any)) != 0 {
+	if code != 0 || len(dataMap(t, decodeEnvelope(t, stdout))["events"].([]any)) != 1 {
 		t.Fatalf("events after remove = %s", stdout)
+	}
+	code, stdout, _ = runCLI(t, env, "purge", watchID, "--yes", "--json")
+	if code != 0 || dataMap(t, decodeEnvelope(t, stdout))["purged"] != true {
+		t.Fatalf("purge = %s", stdout)
+	}
+	code, stdout, _ = runCLI(t, env, "events", "--json")
+	if code != 0 || len(dataMap(t, decodeEnvelope(t, stdout))["events"].([]any)) != 0 {
+		t.Fatalf("events after purge = %s", stdout)
 	}
 }
 
@@ -380,7 +392,7 @@ func TestCLIBackupRestoreAndDoctor(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("backup = %s", stdout)
 	}
-	if dataMap(t, decodeEnvelope(t, stdout))["schema_version"] != float64(1) {
+	if dataMap(t, decodeEnvelope(t, stdout))["schema_version"] != float64(2) {
 		t.Fatalf("backup data = %s", stdout)
 	}
 

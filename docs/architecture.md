@@ -9,7 +9,7 @@ Release Watcher is a modular monolith in one Go binary. It is invoked as a CLI, 
 ```text
 cmd/release-watcher        process entrypoint, signals, exit code
 internal/cli               argument parsing, human and JSON rendering
-internal/app               use cases: add, list, show, scan, events, pause/resume/interval/remove,
+internal/app               use cases: add, list, show, scan, events, pause/resume/interval/remove/purge,
                            doctor, backup, restore, notify
 internal/scan              snapshot comparison and event creation
 internal/domain            Work, Publication, Source, Watch, Release, Event, Delivery, ScanRun

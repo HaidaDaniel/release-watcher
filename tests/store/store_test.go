@@ -99,8 +99,8 @@ func TestMigrationsIdempotentAndRestart(t *testing.T) {
 	ctx := context.Background()
 
 	v, err := s.SchemaVersion(ctx)
-	if err != nil || v != 1 {
-		t.Fatalf("schema version = %d, err=%v; want 1", v, err)
+	if err != nil || v != 2 {
+		t.Fatalf("schema version = %d, err=%v; want 2", v, err)
 	}
 
 	f := createFixture(t, s, "N1000AA", true, time.Now().UTC())
@@ -113,7 +113,7 @@ func TestMigrationsIdempotentAndRestart(t *testing.T) {
 		t.Fatalf("reopen: %v", err)
 	}
 	defer reopened.Close()
-	if v, err := reopened.SchemaVersion(ctx); err != nil || v != 1 {
+	if v, err := reopened.SchemaVersion(ctx); err != nil || v != 2 {
 		t.Fatalf("reopened schema version = %d, err=%v", v, err)
 	}
 	got, err := reopened.Queries().GetWork(ctx, f.work.ID)
@@ -558,5 +558,64 @@ func TestListPublicationsDoesNotDeadlock(t *testing.T) {
 	}
 	if len(watches) != 2 {
 		t.Fatalf("watches = %d, want 2", len(watches))
+	}
+}
+
+func TestUnwatchPreservesHistoryAndRestoreReusesRows(t *testing.T) {
+	s, _ := openStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	f := createFixture(t, s, "N8000AA", true, now)
+
+	release := &domain.Release{
+		ID: id.New("rel"), PublicationID: f.publication.ID, ExternalID: "N8000AA/1",
+		Kind: domain.ReleaseChapter, ContentHash: "h", FirstSeenAt: now, LastSeenAt: now,
+	}
+	if err := s.Queries().InsertRelease(ctx, release); err != nil {
+		t.Fatal(err)
+	}
+	event := &domain.Event{
+		ID: id.New("evt"), Type: domain.EventReleaseAdded, PublicationID: f.publication.ID,
+		WatchID: f.watch.ID, SourceID: f.source.ID, ExternalWorkReference: "ncode:N8000AA",
+		ReleaseIDs: []string{"N8000AA/1"}, Payload: json.RawMessage(`{"x":1}`),
+		DedupeKey: "unwatch-1", SchemaVersion: "1.0", DetectedAt: now, CreatedAt: now,
+	}
+	if _, err := s.Queries().InsertEvent(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.Queries().MarkWatchRemoved(ctx, f.watch.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	watch, err := s.Queries().GetWatch(ctx, f.watch.ID)
+	if err != nil || watch.RemovedAt == nil || watch.Enabled {
+		t.Fatalf("removed watch = %+v err=%v", watch, err)
+	}
+	watches, err := s.Queries().ListWatches(ctx)
+	if err != nil || len(watches) != 0 {
+		t.Fatalf("list after unwatch = %+v err=%v", watches, err)
+	}
+	events, err := s.Queries().ListEvents(ctx, store.EventFilter{WatchID: f.watch.ID})
+	if err != nil || len(events) != 1 || events[0].ID != event.ID {
+		t.Fatalf("events after unwatch = %+v err=%v", events, err)
+	}
+	if _, err := s.Queries().GetPublication(ctx, f.publication.ID); err != nil {
+		t.Fatalf("publication after unwatch: %v", err)
+	}
+
+	if err := s.Queries().RestoreWatch(ctx, f.watch.ID, now.Add(time.Hour), now); err != nil {
+		t.Fatal(err)
+	}
+	watch, err = s.Queries().GetWatch(ctx, f.watch.ID)
+	if err != nil || watch.RemovedAt != nil || !watch.Enabled {
+		t.Fatalf("restored watch = %+v err=%v", watch, err)
+	}
+	watches, _ = s.Queries().ListWatches(ctx)
+	if len(watches) != 1 || watches[0].ID != f.watch.ID {
+		t.Fatalf("list after restore = %+v", watches)
+	}
+	events, _ = s.Queries().ListEvents(ctx, store.EventFilter{WatchID: f.watch.ID})
+	if len(events) != 1 {
+		t.Fatalf("events after restore = %d", len(events))
 	}
 }

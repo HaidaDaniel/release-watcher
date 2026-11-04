@@ -25,6 +25,7 @@ type WatchView struct {
 	LastCheckedAt     *time.Time `json:"last_checked_at"`
 	LastSuccessAt     *time.Time `json:"last_success_at"`
 	NextCheckAt       time.Time  `json:"next_check_at"`
+	RemovedAt         *time.Time `json:"removed_at"`
 	LastErrorCategory *string    `json:"last_error_category"`
 	ReleaseCount      *int64     `json:"release_count"`
 	Mode              string     `json:"mode"`
@@ -150,7 +151,14 @@ type ScanResult struct {
 }
 
 type RemoveResult struct {
-	Removed       bool   `json:"removed"`
+	Removed          bool   `json:"removed"`
+	HistoryPreserved bool   `json:"history_preserved"`
+	WatchID          string `json:"watch_id"`
+	PublicationID    string `json:"publication_id"`
+}
+
+type PurgeResult struct {
+	Purged        bool   `json:"purged"`
 	WatchID       string `json:"watch_id"`
 	PublicationID string `json:"publication_id"`
 }

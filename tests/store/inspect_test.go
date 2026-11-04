@@ -31,11 +31,11 @@ func TestInspectSchemaAndVacuumInto(t *testing.T) {
 		t.Fatalf("database permissions = %o", liveInfo.Mode().Perm())
 	}
 	version, err := store.InspectSchema(ctx, path)
-	if err != nil || version != 1 {
+	if err != nil || version != 2 {
 		t.Fatalf("inspect live = %d err=%v", version, err)
 	}
 	known, err := store.KnownSchemaVersion()
-	if err != nil || known != 1 {
+	if err != nil || known != 2 {
 		t.Fatalf("known = %d err=%v", known, err)
 	}
 	copyPath := filepath.Join(dir, "copy.db")
@@ -43,7 +43,7 @@ func TestInspectSchemaAndVacuumInto(t *testing.T) {
 		t.Fatal(err)
 	}
 	version, err = store.InspectSchema(ctx, copyPath)
-	if err != nil || version != 1 {
+	if err != nil || version != 2 {
 		t.Fatalf("inspect copy = %d err=%v", version, err)
 	}
 	info, err := os.Stat(copyPath)
@@ -76,7 +76,7 @@ func TestInspectSchemaDoesNotCreateSidecars(t *testing.T) {
 		_ = os.Remove(path + suffix)
 	}
 	version, err := store.InspectSchema(ctx, path)
-	if err != nil || version != 1 {
+	if err != nil || version != 2 {
 		t.Fatalf("inspect = %d err=%v", version, err)
 	}
 	for _, suffix := range []string{"-wal", "-shm"} {
@@ -105,7 +105,7 @@ func TestInspectSchemaWithLiveWALDoesNotModifySourceSidecars(t *testing.T) {
 		}
 	}
 	version, err := store.InspectSchema(ctx, path)
-	if err != nil || version != 1 {
+	if err != nil || version != 2 {
 		t.Fatalf("inspect live = %d err=%v", version, err)
 	}
 	for _, candidate := range []string{path, path + "-wal", path + "-shm"} {

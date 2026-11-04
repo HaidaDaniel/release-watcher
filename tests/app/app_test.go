@@ -296,8 +296,19 @@ func TestDueIntervalPauseResumeRemove(t *testing.T) {
 		t.Fatalf("watches after remove = %+v", list.Watches)
 	}
 	events, _ := env.svc.Events(ctx, app.EventQuery{})
+	if len(events.Events) != 2 {
+		t.Fatalf("events after remove = %d, want preserved history", len(events.Events))
+	}
+	show, showErr := env.svc.Show(ctx, added.WatchID)
+	if showErr != nil || show.Watch.RemovedAt == nil || len(show.Releases) == 0 {
+		t.Fatalf("history after remove = %+v err=%v", show, showErr)
+	}
+	if _, err := env.svc.Purge(ctx, added.WatchID); err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	events, _ = env.svc.Events(ctx, app.EventQuery{})
 	if len(events.Events) != 0 {
-		t.Fatalf("events after remove = %d", len(events.Events))
+		t.Fatalf("events after purge = %d", len(events.Events))
 	}
 }
 
@@ -640,5 +651,74 @@ func TestAddCollapsesDuplicateFeedEntries(t *testing.T) {
 	show, _ := env.svc.Show(ctx, added.WatchID)
 	if len(show.Releases) != 1 {
 		t.Fatalf("releases = %d", len(show.Releases))
+	}
+}
+
+func TestRemovePreservesHistoryAndReAddRestores(t *testing.T) {
+	n := newNaroFixture(t, []string{"One", "Two", "Three"})
+	env := newTestEnv(t, n)
+	ctx := context.Background()
+	added := addNaro(t, env, nil)
+
+	n.setChapters([]string{"One", "Two", "Three", "Four"})
+	scanID(t, env, added.WatchID)
+
+	removed, err := env.svc.Remove(ctx, added.WatchID)
+	if err != nil || !removed.Removed || !removed.HistoryPreserved {
+		t.Fatalf("remove = %+v err=%v", removed, err)
+	}
+	list, _ := env.svc.List(ctx)
+	if len(list.Watches) != 0 {
+		t.Fatalf("list after remove = %+v", list.Watches)
+	}
+	events, _ := env.svc.Events(ctx, app.EventQuery{})
+	if len(events.Events) != 1 {
+		t.Fatalf("events after remove = %d", len(events.Events))
+	}
+	show, showErr := env.svc.Show(ctx, added.WatchID)
+	if showErr != nil || show.Watch.RemovedAt == nil || len(show.Releases) != 4 {
+		t.Fatalf("show after remove = %+v err=%v", show, showErr)
+	}
+	if _, scanErr := env.svc.Scan(ctx, app.ScanOptions{Mode: "id", ID: added.WatchID}); scanErr == nil || scanErr.Code != "invalid_argument" {
+		t.Fatalf("scan removed watch = %+v", scanErr)
+	}
+
+	restored, addErr := env.svc.Add(ctx, app.AddInput{URL: naroURL})
+	if addErr != nil {
+		t.Fatal(addErr)
+	}
+	if restored.Created || restored.Reason != "restored" || restored.WatchID != added.WatchID {
+		t.Fatalf("re-add = %+v", restored)
+	}
+	show, _ = env.svc.Show(ctx, added.WatchID)
+	if show.Watch.RemovedAt != nil || len(show.Releases) != 4 {
+		t.Fatalf("restored show = %+v", show)
+	}
+	events, _ = env.svc.Events(ctx, app.EventQuery{})
+	if len(events.Events) != 1 {
+		t.Fatalf("re-add replayed old chapters: %d events", len(events.Events))
+	}
+	replay := scanID(t, env, added.WatchID)
+	if replay.EventsCreated != 0 {
+		t.Fatalf("replay after restore = %+v", replay)
+	}
+
+	n.setChapters([]string{"One", "Two", "Three", "Four", "Five"})
+	fresh := scanID(t, env, added.WatchID)
+	if fresh.EventsCreated != 1 {
+		t.Fatalf("new chapter after restore = %+v", fresh)
+	}
+	show, _ = env.svc.Show(ctx, added.WatchID)
+	if len(show.Releases) != 5 {
+		t.Fatalf("releases after restore = %d", len(show.Releases))
+	}
+	ids := map[string]int{}
+	for _, release := range show.Releases {
+		ids[release.ExternalID]++
+	}
+	for externalID, count := range ids {
+		if count != 1 {
+			t.Fatalf("duplicate release %s x%d", externalID, count)
+		}
 	}
 }

@@ -44,6 +44,9 @@ func (s *Service) Scan(ctx context.Context, opts ScanOptions) (*ScanResult, *Err
 		if getErr != nil {
 			return nil, mapError(getErr)
 		}
+		if watch.RemovedAt != nil {
+			return nil, newError("invalid_argument", "watch is removed; re-add the URL to restore it", nil)
+		}
 		watches = []domain.Watch{*watch}
 	case "all":
 		all, listErr := q.ListWatches(ctx)

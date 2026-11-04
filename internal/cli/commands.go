@@ -353,7 +353,35 @@ func (r *runner) remove(ctx context.Context, args []string) int {
 		r.writeJSON(envelope{SchemaVersion: SchemaVersion, OK: true, Data: result})
 		return ExitOK
 	}
-	fmt.Fprintf(r.stdout, "%s %s\n", r.t("Удалено наблюдение", "Removed watch"), result.WatchID)
+	fmt.Fprintf(r.stdout, "%s %s (%s)\n", r.t("Наблюдение остановлено", "Stopped watching"), result.WatchID, r.t("история сохранена", "history preserved"))
+	return ExitOK
+}
+
+func (r *runner) purge(ctx context.Context, args []string) int {
+	values, positionals, err := parseCommandArgs(args, map[string]flagKind{"yes": boolFlag})
+	if err != nil {
+		return r.fail(err)
+	}
+	if len(positionals) != 1 {
+		return r.fail(&commandError{code: "usage", message: "usage: release-watcher purge <watch-id> --yes", exit: ExitUsage})
+	}
+	if !flagBool(values, "yes") {
+		return r.fail(&commandError{code: "usage", message: "purge requires --yes", exit: ExitUsage})
+	}
+	svc, closeStore, openErr := r.openService(ctx)
+	if openErr != nil {
+		return r.fail(openErr)
+	}
+	defer closeStore()
+	result, appErr := svc.Purge(ctx, positionals[0])
+	if appErr != nil {
+		return r.failApp(appErr)
+	}
+	if r.json {
+		r.writeJSON(envelope{SchemaVersion: SchemaVersion, OK: true, Data: result})
+		return ExitOK
+	}
+	fmt.Fprintf(r.stdout, "%s %s\n", r.t("Удалено наблюдение и история", "Purged watch and history"), result.WatchID)
 	return ExitOK
 }
 

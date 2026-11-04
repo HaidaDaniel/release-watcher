@@ -45,6 +45,9 @@ func (s *Service) Add(ctx context.Context, in AddInput) (*AddResult, *Error) {
 	if existing, found, findErr := s.findExistingAdd(ctx, in.URL, parsedURL); findErr != nil {
 		return nil, findErr
 	} else if found {
+		if existing.RemovedAt != nil {
+			return s.restoreAdd(ctx, existing)
+		}
 		return existing, nil
 	}
 
@@ -278,6 +281,50 @@ func (s *Service) Add(ctx context.Context, in AddInput) (*AddResult, *Error) {
 		result.Warnings = []string{}
 	}
 	return result, nil
+}
+
+func (s *Service) restoreAdd(ctx context.Context, existing *AddResult) (*AddResult, *Error) {
+	now := s.now()
+	txErr := s.store.InTx(ctx, func(q *store.Queries) error {
+		watch, err := q.GetWatch(ctx, existing.WatchID)
+		if err != nil {
+			return err
+		}
+		if watch.RemovedAt == nil {
+			return nil
+		}
+		nextCheck := now.Add(time.Duration(watch.IntervalSeconds) * time.Second)
+		if err := q.RestoreWatch(ctx, watch.ID, nextCheck, now); err != nil {
+			return err
+		}
+		return q.UpdatePublicationNextCheck(ctx, watch.PublicationID, nextCheck, now)
+	})
+	if txErr != nil {
+		return nil, mapError(txErr)
+	}
+	b, loadErr := s.loadBundle(ctx, s.store.Queries(), existing.WatchID)
+	if loadErr != nil {
+		return nil, mapError(loadErr)
+	}
+	baseline := int64(0)
+	if b.watch.BaselineCount != nil {
+		baseline = *b.watch.BaselineCount
+	} else if b.publication.ReleaseCount != nil {
+		baseline = *b.publication.ReleaseCount
+	}
+	fields := existing.FieldsAvailable
+	if fields == nil {
+		fields = []string{}
+	}
+	return &AddResult{
+		WatchView:             s.watchView(b),
+		Created:               false,
+		Reason:                "restored",
+		BaselineReleases:      baseline,
+		FieldsAvailable:       fields,
+		Warnings:              []string{},
+		ExternalWorkReference: existing.ExternalWorkReference,
+	}, nil
 }
 
 func baselineRelease(r source.Release, publicationID string, now time.Time) domain.Release {

@@ -125,3 +125,11 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Context: The default watch interval is 24h, but the shipped timer ran hourly. Hourly wake-ups add noise and battery/IO cost without improving the default experience. A user-level timer also needs explicit lingering guidance for machines that reboot without a login.
 - Decision: Ship one user-level timer at `OnCalendar=*-*-* 04:15:00` local time with `Persistent=true`, `RandomizedDelaySec=15m` and a oneshot service. Do not enable lingering automatically. `doctor` reads the installed timer, compares its cadence with the shortest enabled watch interval, and warns with an override hint when the timer is too slow or cannot be parsed.
 - Consequences: Default installations check once per day and recover missed runs. Users who configure shorter intervals must edit `OnCalendar` or accept delayed checks. The installer prints the explicit `loginctl enable-linger` command when lingering is off.
+
+## ADR-0018 — Unwatch preserves history; purge is explicit
+
+- Date: 2026-11-04
+- Status: Accepted and implemented by task 0014
+- Context: The original `remove` deleted the watch, publication line, releases, events, deliveries and scan runs. That destroys the history a release watcher exists to keep and makes re-adding a work look like a fresh baseline.
+- Decision: `remove`/unwatch marks the watch with `removed_at`, disables scheduling and preserves all observation history. `list` hides removed watches; `show`, `events` and exports still work. Re-adding the same URL restores the same watch and rows without duplicate releases or old-chapter notifications. `purge` is the only destructive command and requires `--yes`. Migration `0002_watch_unwatch.sql` adds the nullable `removed_at` column to existing databases.
+- Consequences: Event ids remain stable across unwatch/restore. Existing databases migrate in place. Destructive deletion is explicit and separately tested. Removed watches must be re-added before scanning, pausing, resuming or changing their interval.

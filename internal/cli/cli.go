@@ -128,6 +128,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return r.interval(ctx, commandArgs)
 	case "remove":
 		return r.remove(ctx, commandArgs)
+	case "purge":
+		return r.purge(ctx, commandArgs)
 	default:
 		return r.fail(&commandError{
 			code:    "usage",
@@ -788,7 +790,8 @@ const helpRU = `Release Watcher — отслеживание новых публ
   resume <id>               возобновить наблюдение
   interval <id> <dur>       изменить интервал наблюдения
   interval --global <dur>   изменить интервал по умолчанию
-  remove <id> --yes         удалить наблюдение и его данные
+  remove <id> --yes         прекратить наблюдение, сохранив историю
+  purge <id> --yes          удалить наблюдение и всю историю
   doctor                    проверить конфигурацию и окружение
   version                   показать версию и build identity
   help                      показать эту справку
@@ -820,7 +823,8 @@ Commands:
   resume <id>               resume a watch
   interval <id> <dur>       change a watch interval
   interval --global <dur>   change the default interval
-  remove <id> --yes         remove a watch and its data
+  remove <id> --yes         stop watching and keep history
+  purge <id> --yes          delete a watch and all history
   doctor                    inspect configuration and environment
   version                   show version and build identity
   help                      show this help

@@ -123,7 +123,7 @@ Success `data`:
 }
 ```
 
-A repeated `add` for the same source line returns `ok: true`, `created: false`, the existing watch, and `data.reason = "already_exists"` (not an error envelope), so automation can be idempotent. The existing watch is resolved locally before any network request, so a duplicate add works even when the source is currently unavailable. It never creates a second watch or a baseline event.
+A repeated `add` for the same source line returns `ok: true`, `created: false`, the existing watch, and `data.reason = "already_exists"` (not an error envelope), so automation can be idempotent. Re-adding a previously removed URL returns `created: false` with `data.reason = "restored"` and re-enables the existing watch. The existing watch is resolved locally before any network request, so a duplicate add works even when the source is currently unavailable. It never creates a second watch or a baseline event.
 
 ## `list` and `show`
 
@@ -151,6 +151,7 @@ A repeated `add` for the same source line returns `ok: true`, `created: false`, 
       "last_checked_at": "...",
       "last_success_at": "...",
       "next_check_at": "...",
+      "removed_at": null,
       "last_error_category": null,
       "release_count": 210,
       "mode": "catalog",
@@ -287,9 +288,13 @@ Count-only events have `release_ids: []`, a non-null `previous_count`/`current_c
 
 The Narō novel API `end` field is authoritative only for the values documented by the official specification (`https://dev.syosetu.com/man/api/`): `0` means a short story or completed work, and `1` means ongoing. A missing, `null` or unsupported value leaves `status` as `unknown` and `status_source` empty. Inactivity and an old `general_lastup` never imply completion. A `completed` watch remains enabled because an author may resume publication.
 
-## `pause`, `resume`, `interval`, `remove`
+## `pause`, `resume`, `interval`, `remove`, `purge`
 
-`pause`, `resume` and `interval` return the affected watch object in `data` (same fields as `list`). `interval --global 24h` returns `{"global_interval_seconds": 86400}` and updates every watch still using the previous default interval; watches with a custom interval keep it. `interval <id> 24h` validates a duration of at least 1m and stores it in seconds. `remove <id> --yes` returns `{"removed": true, "watch_id": "...", "publication_id": "..."}`; it deletes the watch, publication line, releases, events, deliveries and scan runs in one transaction. Work/Source rows are removed only when unreferenced. Removing one watch never touches another publication line.
+`pause`, `resume` and `interval` return the affected watch object in `data` (same fields as `list`). `interval --global 24h` returns `{"global_interval_seconds": 86400}` and updates every watch still using the previous default interval; watches with a custom interval keep it. `interval <id> 24h` validates a duration of at least 1m and stores it in seconds.
+
+`remove <id> --yes` stops watching but preserves history. It returns `{"removed": true, "history_preserved": true, "watch_id": "...", "publication_id": "..."}`. The watch is disabled, disappears from `list`, and its publication line, releases, events, deliveries and scan runs remain readable through `show` and `events`; `event_id` values stay stable. Re-adding the same URL restores the same watch (`created: false`, `reason: "restored"`) without duplicating releases or replaying old chapters. Removed watches cannot be scanned, paused, resumed or have their interval changed until re-added.
+
+`purge <id> --yes` is the explicit destructive operation and returns `{"purged": true, "watch_id": "...", "publication_id": "..."}`. It deletes the watch, publication line, releases, events, deliveries and scan runs in one transaction. Work/Source rows are removed only when unreferenced. Neither command touches another publication line.
 
 ## `notify`
 

@@ -12,7 +12,7 @@ import (
 
 const watchColumns = `id, publication_id, enabled, interval_seconds, baseline_established_at,
 	baseline_count, mode, next_check_at, last_check_at, last_success_at, last_error_category,
-	consecutive_failures, paused_at, created_at, updated_at`
+	consecutive_failures, paused_at, removed_at, created_at, updated_at`
 
 func (q *Queries) CreateWatch(ctx context.Context, w *domain.Watch) error {
 	if !w.Mode.Valid() {
@@ -23,12 +23,12 @@ func (q *Queries) CreateWatch(ctx context.Context, w *domain.Watch) error {
 	}
 	_, err := q.q.ExecContext(ctx,
 		`INSERT INTO watch (`+watchColumns+`)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.PublicationID, boolInt(w.Enabled), w.IntervalSeconds,
 		formatTimePtr(w.BaselineEstablishedAt), int64PtrValue(w.BaselineCount), string(w.Mode),
 		formatTime(w.NextCheckAt), formatTimePtr(w.LastCheckAt), formatTimePtr(w.LastSuccessAt),
 		nullIfEmpty(w.LastErrorCategory), w.ConsecutiveFailures, formatTimePtr(w.PausedAt),
-		formatTime(w.CreatedAt), formatTime(w.UpdatedAt),
+		formatTimePtr(w.RemovedAt), formatTime(w.CreatedAt), formatTime(w.UpdatedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("store: create watch: %w", err)
@@ -61,7 +61,7 @@ func (q *Queries) GetWatchByPublication(ctx context.Context, publicationID strin
 }
 
 func (q *Queries) ListWatches(ctx context.Context) ([]domain.Watch, error) {
-	return q.listWatch(ctx, `SELECT `+watchColumns+` FROM watch ORDER BY created_at ASC, id ASC`)
+	return q.listWatch(ctx, `SELECT `+watchColumns+` FROM watch WHERE removed_at IS NULL ORDER BY created_at ASC, id ASC`)
 }
 
 func (q *Queries) ListDueWatches(ctx context.Context, now time.Time, limit int) ([]domain.Watch, error) {
@@ -103,7 +103,7 @@ func scanWatch(row rowScanner) (*domain.Watch, error) {
 		enabled                            int
 		mode                               string
 		baselineAt, lastCheck, lastSuccess sql.NullString
-		pausedAt                           sql.NullString
+		pausedAt, removedAt                sql.NullString
 		baselineCount                      sql.NullInt64
 		errorCategory                      sql.NullString
 		nextCheck, created, updated        string
@@ -111,7 +111,7 @@ func scanWatch(row rowScanner) (*domain.Watch, error) {
 	err := row.Scan(
 		&w.ID, &w.PublicationID, &enabled, &w.IntervalSeconds, &baselineAt,
 		&baselineCount, &mode, &nextCheck, &lastCheck, &lastSuccess, &errorCategory,
-		&w.ConsecutiveFailures, &pausedAt, &created, &updated,
+		&w.ConsecutiveFailures, &pausedAt, &removedAt, &created, &updated,
 	)
 	if err != nil {
 		return nil, err
@@ -129,6 +129,9 @@ func scanWatch(row rowScanner) (*domain.Watch, error) {
 		return nil, err
 	}
 	if w.PausedAt, err = scanTime(pausedAt); err != nil {
+		return nil, err
+	}
+	if w.RemovedAt, err = scanTime(removedAt); err != nil {
 		return nil, err
 	}
 	w.BaselineCount = scanInt64Ptr(baselineCount)
@@ -205,6 +208,35 @@ func (q *Queries) SetWatchEnabled(ctx context.Context, id string, enabled bool, 
 	)
 	if err != nil {
 		return fmt.Errorf("store: set watch enabled: %w", err)
+	}
+	return expectOne(res)
+}
+
+// MarkWatchRemoved stops scheduling a watch while preserving its publication,
+// releases, events, deliveries and scan history. Re-adding the same URL can
+// restore the same row.
+func (q *Queries) MarkWatchRemoved(ctx context.Context, id string, now time.Time) error {
+	res, err := q.q.ExecContext(ctx,
+		`UPDATE watch SET enabled = 0, paused_at = NULL, removed_at = ?, updated_at = ? WHERE id = ?`,
+		formatTime(now), formatTime(now), id,
+	)
+	if err != nil {
+		return fmt.Errorf("store: mark watch removed: %w", err)
+	}
+	return expectOne(res)
+}
+
+// RestoreWatch reactivates an unwatched watch without resetting its baseline or
+// releases, so already-known chapters do not produce false events.
+func (q *Queries) RestoreWatch(ctx context.Context, id string, nextCheck, now time.Time) error {
+	res, err := q.q.ExecContext(ctx,
+		`UPDATE watch SET enabled = 1, paused_at = NULL, removed_at = NULL,
+			last_error_category = NULL, consecutive_failures = 0,
+			next_check_at = ?, updated_at = ? WHERE id = ?`,
+		formatTime(nextCheck), formatTime(now), id,
+	)
+	if err != nil {
+		return fmt.Errorf("store: restore watch: %w", err)
 	}
 	return expectOne(res)
 }
