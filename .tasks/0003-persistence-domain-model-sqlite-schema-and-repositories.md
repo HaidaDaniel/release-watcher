@@ -1,6 +1,6 @@
 # Task 0003 - Persistence: domain model, SQLite schema and repositories
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
