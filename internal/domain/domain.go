@@ -114,13 +114,14 @@ func (e EventType) Valid() bool {
 type DeliveryStatus string
 
 const (
-	DeliveryPending DeliveryStatus = "pending"
-	DeliverySent    DeliveryStatus = "sent"
-	DeliveryFailed  DeliveryStatus = "failed"
+	DeliveryPending  DeliveryStatus = "pending"
+	DeliverySent     DeliveryStatus = "sent"
+	DeliveryFailed   DeliveryStatus = "failed"
+	DeliveryCanceled DeliveryStatus = "canceled"
 )
 
 func (d DeliveryStatus) Valid() bool {
-	return d == DeliveryPending || d == DeliverySent || d == DeliveryFailed
+	return d == DeliveryPending || d == DeliverySent || d == DeliveryFailed || d == DeliveryCanceled
 }
 
 type ScanResult string

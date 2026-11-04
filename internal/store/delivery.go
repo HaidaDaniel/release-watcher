@@ -85,7 +85,7 @@ func (q *Queries) ListDeliveriesByEvent(ctx context.Context, eventID string) ([]
 func (q *Queries) MarkDeliverySent(ctx context.Context, id string, now time.Time) error {
 	res, err := q.q.ExecContext(ctx,
 		`UPDATE notification_delivery SET status = 'sent', attempts = attempts + 1,
-			sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
+			sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND status IN ('pending', 'failed')`,
 		formatTime(now), formatTime(now), id,
 	)
 	if err != nil {
@@ -97,13 +97,29 @@ func (q *Queries) MarkDeliverySent(ctx context.Context, id string, now time.Time
 func (q *Queries) MarkDeliveryFailed(ctx context.Context, id string, nextAttempt time.Time, lastError string, now time.Time) error {
 	res, err := q.q.ExecContext(ctx,
 		`UPDATE notification_delivery SET status = 'failed', attempts = attempts + 1,
-			next_attempt_at = ?, last_error = ?, updated_at = ? WHERE id = ?`,
+			next_attempt_at = ?, last_error = ?, updated_at = ? WHERE id = ? AND status IN ('pending', 'failed')`,
 		formatTime(nextAttempt), lastError, formatTime(now), id,
 	)
 	if err != nil {
 		return fmt.Errorf("store: mark delivery failed: %w", err)
 	}
 	return expectOne(res)
+}
+
+// CancelPendingDeliveriesForWatch turns pending and failed deliveries for one
+// watch into a terminal canceled state. Sent deliveries are left untouched.
+func (q *Queries) CancelPendingDeliveriesForWatch(ctx context.Context, watchID string, now time.Time) (int64, error) {
+	res, err := q.q.ExecContext(ctx,
+		`UPDATE notification_delivery SET status = 'canceled', next_attempt_at = ?,
+			last_error = 'watch removed', updated_at = ?
+		 WHERE status IN ('pending', 'failed')
+		   AND event_id IN (SELECT id FROM event WHERE watch_id = ?)`,
+		formatTime(now), formatTime(now), watchID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("store: cancel watch deliveries: %w", err)
+	}
+	return res.RowsAffected()
 }
 
 func (q *Queries) CountDeliveriesByStatus(ctx context.Context) (map[string]int64, error) {

@@ -124,9 +124,10 @@ type ErrorView struct {
 }
 
 type NotificationCounts struct {
-	Pending int `json:"pending"`
-	Sent    int `json:"sent"`
-	Failed  int `json:"failed"`
+	Pending  int `json:"pending"`
+	Sent     int `json:"sent"`
+	Failed   int `json:"failed"`
+	Canceled int `json:"canceled"`
 }
 
 type ScanWatchResult struct {
@@ -151,10 +152,11 @@ type ScanResult struct {
 }
 
 type RemoveResult struct {
-	Removed          bool   `json:"removed"`
-	HistoryPreserved bool   `json:"history_preserved"`
-	WatchID          string `json:"watch_id"`
-	PublicationID    string `json:"publication_id"`
+	Removed            bool   `json:"removed"`
+	HistoryPreserved   bool   `json:"history_preserved"`
+	CanceledDeliveries int    `json:"canceled_deliveries"`
+	WatchID            string `json:"watch_id"`
+	PublicationID      string `json:"publication_id"`
 }
 
 type PurgeResult struct {

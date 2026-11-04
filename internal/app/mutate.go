@@ -104,12 +104,25 @@ func (s *Service) Remove(ctx context.Context, watchID string) (*RemoveResult, *E
 	if err != nil {
 		return nil, mapError(err)
 	}
+	canceled := 0
 	if watch.RemovedAt == nil {
-		if err := q.MarkWatchRemoved(ctx, watchID, s.now()); err != nil {
-			return nil, mapError(err)
+		now := s.now()
+		txErr := s.store.InTx(ctx, func(tx *store.Queries) error {
+			if err := tx.MarkWatchRemoved(ctx, watchID, now); err != nil {
+				return err
+			}
+			count, err := tx.CancelPendingDeliveriesForWatch(ctx, watchID, now)
+			if err != nil {
+				return err
+			}
+			canceled = int(count)
+			return nil
+		})
+		if txErr != nil {
+			return nil, mapError(txErr)
 		}
 	}
-	return &RemoveResult{Removed: true, HistoryPreserved: true, WatchID: watchID, PublicationID: watch.PublicationID}, nil
+	return &RemoveResult{Removed: true, HistoryPreserved: true, CanceledDeliveries: canceled, WatchID: watchID, PublicationID: watch.PublicationID}, nil
 }
 
 func (s *Service) Purge(ctx context.Context, watchID string) (*PurgeResult, *Error) {

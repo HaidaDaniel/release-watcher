@@ -1,6 +1,6 @@
 # Domain model
 
-Status: implemented by migrations 0001–0002 and `internal/store`, with source adapters and scan logic implemented and tested.
+Status: implemented by migrations 0001–0003 and `internal/store`, with source adapters and scan logic implemented and tested.
 
 ## Entity overview
 
@@ -90,7 +90,7 @@ A specific observation of a Publication.
 | `removed_at` | nullable; set when the user stops watching while history is preserved |
 | `created_at`, `updated_at` | local timestamps |
 
-Pause/resume changes only scheduling. `remove`/unwatch sets `removed_at`, disables scheduling and preserves the publication line, releases, events, deliveries and scan runs; event ids stay stable and history export keeps working. Re-adding the same URL restores the same watch and does not duplicate releases or replay already-known chapters. `purge` is the explicit destructive operation: it deletes the observation, its publication line, releases, events, deliveries and scan runs in one transaction. Work and Source rows are removed only when no other publication line still references them. Neither operation silently modifies another publication line.
+Pause/resume changes only scheduling. `remove`/unwatch sets `removed_at`, disables scheduling and preserves the publication line, releases, events, deliveries and scan runs; event ids stay stable and history export keeps working. Re-adding the same URL restores the same watch and does not duplicate releases or replay already-known chapters; old canceled deliveries stay canceled. `purge` is the explicit destructive operation: it deletes the observation, its publication line, releases, events, deliveries and scan runs in one transaction. Work and Source rows are removed only when no other publication line still references them. Neither operation silently modifies another publication line.
 
 ## Release
 
@@ -144,13 +144,13 @@ A durable attempt to deliver one event over one channel.
 | `id` | internal id |
 | `event_id` | source event |
 | `channel` | `telegram` in the MVP |
-| `status` | `pending`, `sent`, `failed` |
+| `status` | `pending`, `sent`, `failed`, `canceled` |
 | `attempts` | attempts made |
 | `next_attempt_at` | retry schedule |
 | `last_error` | bounded, secret-free error |
 | `sent_at` | success time |
 
-A unique `(event_id, channel)` constraint prevents duplicate deliveries. Retrying a failed delivery never creates a second event.
+A unique `(event_id, channel)` constraint prevents duplicate deliveries. Retrying a failed delivery never creates a second event. `remove` atomically marks that watch's pending and failed deliveries `canceled`; canceled is terminal and is never selected for delivery again, including after restart or re-add. `pause` does not cancel deliveries.
 
 ## ScanRun
 

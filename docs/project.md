@@ -1,6 +1,6 @@
 # Release Watcher
 
-Status: Functional MVP implemented and tested locally. The repository foundation, SQLite persistence (schema 2), Narō/RSS/Atom adapters, scan detection, CLI vertical slice, optional durable Telegram outbox, backup/restore, read-only doctor, daily user systemd timer, unwatch/purge history semantics and Linux builds are implemented. The live Narō smoke and isolated end-to-end regression pass. A deployed MVP on a real Linux host and the Whoosh spike remain planned/blocked; this document separates those states explicitly.
+Status: Functional MVP implemented and tested locally. The repository foundation, SQLite persistence (schema 3), Narō/RSS/Atom adapters, scan detection, CLI vertical slice, optional durable Telegram outbox, backup/restore, read-only doctor, daily user systemd timer, unwatch/purge history semantics and Linux builds are implemented. The live Narō smoke and isolated end-to-end regression pass. A deployed MVP on a real Linux host and the Whoosh spike remain planned/blocked; this document separates those states explicitly.
 
 ## Mission
 

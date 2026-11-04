@@ -231,10 +231,11 @@ func (r *runner) notify(ctx context.Context, args []string) int {
 		r.writeJSON(envelope{SchemaVersion: SchemaVersion, OK: true, Data: counts})
 		return ExitOK
 	}
-	fmt.Fprintf(r.stdout, "%s: %d, %s: %d, %s: %d\n",
+	fmt.Fprintf(r.stdout, "%s: %d, %s: %d, %s: %d, %s: %d\n",
 		r.t("Ожидают", "Pending"), counts.Pending,
 		r.t("Отправлено", "Sent"), counts.Sent,
-		r.t("Ошибок", "Failed"), counts.Failed)
+		r.t("Ошибок", "Failed"), counts.Failed,
+		r.t("Отменено", "Canceled"), counts.Canceled)
 	return ExitOK
 }
 

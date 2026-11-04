@@ -189,7 +189,7 @@ Success `data`:
   "succeeded": 1,
   "failed": 1,
   "events_created": 1,
-  "notifications": {"pending": 0, "sent": 1, "failed": 0},
+  "notifications": {"pending": 0, "sent": 1, "failed": 0, "canceled": 0},
   "results": [
     {
       "watch_id": "watch_...",
@@ -213,7 +213,7 @@ Success `data`:
 }
 ```
 
-One watch failure never prevents the rest. The process exits 3 for a partial failure; the JSON is still complete. The lock error exits 4. Notification counts reflect the outbox after the scan: pending, sent and failed. Events are durable regardless of Telegram.
+One watch failure never prevents the rest. The process exits 3 for a partial failure; the JSON is still complete. The lock error exits 4. Notification counts reflect the outbox after the scan: pending, sent, failed and canceled. Events are durable regardless of Telegram.
 
 ## `events`
 
@@ -292,13 +292,13 @@ The Narō novel API `end` field is authoritative only for the values documented 
 
 `pause`, `resume` and `interval` return the affected watch object in `data` (same fields as `list`). `interval --global 24h` returns `{"global_interval_seconds": 86400}` and updates every watch still using the previous default interval; watches with a custom interval keep it. `interval <id> 24h` validates a duration of at least 1m and stores it in seconds.
 
-`remove <id> --yes` stops watching but preserves history. It returns `{"removed": true, "history_preserved": true, "watch_id": "...", "publication_id": "..."}`. The watch is disabled, disappears from `list`, and its publication line, releases, events, deliveries and scan runs remain readable through `show` and `events`; `event_id` values stay stable. Re-adding the same URL restores the same watch (`created: false`, `reason: "restored"`) without duplicating releases or replaying old chapters. Removed watches cannot be scanned, paused, resumed or have their interval changed until re-added.
+`remove <id> --yes` stops watching but preserves history. It returns `{"removed": true, "history_preserved": true, "canceled_deliveries": N, "watch_id": "...", "publication_id": "..."}`. The watch is disabled, disappears from `list`, and its publication line, releases, events, deliveries and scan runs remain readable through `show` and `events`; `event_id` values stay stable. Pending and failed deliveries for that watch become terminal `canceled` in the same transaction and are never sent later. Re-adding the same URL restores the same watch (`created: false`, `reason: "restored"`) without duplicating releases or replaying old chapters; old canceled deliveries stay canceled. Removed watches cannot be scanned, paused, resumed or have their interval changed until re-added.
 
 `purge <id> --yes` is the explicit destructive operation and returns `{"purged": true, "watch_id": "...", "publication_id": "..."}`. It deletes the watch, publication line, releases, events, deliveries and scan runs in one transaction. Work/Source rows are removed only when unreferenced. Neither command touches another publication line.
 
 ## `notify`
 
-`notify [--json]` flushes due deliveries and returns `{"pending":N,"sent":N,"failed":N}`. It uses the same process lock as `scan`, so a manual notify cannot race a timer scan into sending the same delivery twice. It requires Telegram configuration; without it the command returns `config_error`. Sending is bounded by `RELEASE_WATCHER_MAX_DELIVERY_ATTEMPTS`; 429 uses `retry_after`, other 5xx/network failures use bounded exponential backoff even when the error body is not JSON, and permanent 4xx failures are not retried. A delivery is unique per `(event_id, channel)`, so a repeated scan/flush never duplicates a message. Deliveries are created only for events detected while Telegram is configured; historical events are not sent retroactively. Events remain readable if every attempt fails.
+`notify [--json]` flushes due deliveries and returns `{"pending":N,"sent":N,"failed":N,"canceled":N}`. It uses the same process lock as `scan`, so a manual notify cannot race a timer scan into sending the same delivery twice. It requires Telegram configuration; without it the command returns `config_error`. Sending is bounded by `RELEASE_WATCHER_MAX_DELIVERY_ATTEMPTS`; 429 uses `retry_after`, other 5xx/network failures use bounded exponential backoff even when the error body is not JSON, and permanent 4xx failures are not retried. A delivery is unique per `(event_id, channel)`, so a repeated scan/flush never duplicates a message. Deliveries are created only for events detected while Telegram is configured; historical events are not sent retroactively. Events remain readable if every attempt fails.
 
 Messages are grouped per event (a multi-chapter event becomes one message), use RU by default and EN with `RELEASE_WATCHER_LANG=en`, never include the bot token, and are truncated below Telegram's 4096-character limit.
 

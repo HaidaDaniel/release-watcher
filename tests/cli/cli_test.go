@@ -392,7 +392,7 @@ func TestCLIBackupRestoreAndDoctor(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("backup = %s", stdout)
 	}
-	if dataMap(t, decodeEnvelope(t, stdout))["schema_version"] != float64(2) {
+	if dataMap(t, decodeEnvelope(t, stdout))["schema_version"] != float64(3) {
 		t.Fatalf("backup data = %s", stdout)
 	}
 

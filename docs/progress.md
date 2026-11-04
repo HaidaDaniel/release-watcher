@@ -15,7 +15,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Lefthook pre-commit/pre-push configuration and local verification scripts; pre-push requires pnpm/APK lint and the secret scanner prints only file/line/type.
 - Linux systemd service/timer skeletons.
 - Build script for linux/amd64 and linux/arm64 with ldflags identity.
-- Domain entities and SQLite schema version 2 with Work, Source, Publication, Watch, Release, Event, NotificationDelivery, ScanRun and Setting tables.
+- Domain entities and SQLite schema version 3 with Work, Source, Publication, Watch, Release, Event, NotificationDelivery, ScanRun and Setting tables.
 - Transactional repository layer with event/delivery dedupe and due-watch queries.
 - SSRF-safe HTTP client with timeout, redirect limit, per-host pacing, retries, body limits and no environment proxy.
 - Narō adapter using the official novel API plus paginated catalog pages, with complete/partial/count_only snapshots and the official `end` mapping (`0` completed/short story, `1` ongoing, unknown otherwise).
@@ -31,6 +31,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Linux amd64 and arm64 builds; static systemd verification and local binary smoke checks.
 - Narō `end` mapping corrected to the official specification; unwatch preserves history and `purge` is explicit; daily persistent timer and doctor cadence check; non-leaking secret scanner and mandatory APK lint.
 - Calendar-aware day scheduling prevents daily timer jitter/DST from skipping a day while preserving 6h/12h/24h/48h intervals.
+- `remove` cancels that watch's pending/failed deliveries atomically; canceled deliveries never send after restart or re-add, while pause does not cancel.
 - Live Narō smoke and isolated E2E regression are implemented and pass.
 - Media Core documentation is complete in its separate repository (docs only).
 
@@ -49,6 +50,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Installation tests: backup/restore round-trip, force/exclusivity, bad/missing manifest hash or size, newer/empty schema, sidecar cleanup, symlink/hardlink backup-target rejection, database/archive permissions, doctor schema/newer-schema/read-only sidecar behavior, systemd verification, install rendering with XDG/special paths: see task 0007 evidence.
 - Linux amd64/arm64 builds and local binary smoke checks are recorded in docs/deployment.md.
 - MVP acceptance matrix: `go test ./...`, `go test -race ./...`, `go vet ./...`, `go build ./...`, `scripts/verify-push.sh`, `pnpm exec apkit lint`, linux/amd64 and linux/arm64 builds, release build identity, backup/restore with real data, doctor schema check, systemd unit validation, live Narō smoke, isolated E2E and JSON stdout purity.
+- Notification cancellation tests cover pending, failed, sent, remove, re-add, restart, pause and shared watches: see task 0018 evidence.
 - Scheduling regression tests cover day1 04:29 -> day2 04:18, evening add, missed days, 6h/12h/24h/48h, manual scan --all, same-window replay and Europe/Berlin DST transitions: see task 0017 evidence.
 - Signal/timeout/lock acceptance: a second concurrent scan exits 4 with a JSON `locked` error; SIGINT ends the scan with a partial-failure JSON envelope and exit 3; an external timeout terminates the process; a later run succeeds.
 

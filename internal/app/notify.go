@@ -75,9 +75,10 @@ func (s *Service) DeliveryCounts(ctx context.Context) (NotificationCounts, *Erro
 		return NotificationCounts{}, mapError(err)
 	}
 	return NotificationCounts{
-		Pending: int(counts["pending"]),
-		Sent:    int(counts["sent"]),
-		Failed:  int(counts["failed"]),
+		Pending:  int(counts["pending"]),
+		Sent:     int(counts["sent"]),
+		Failed:   int(counts["failed"]),
+		Canceled: int(counts["canceled"]),
 	}, nil
 }
 
