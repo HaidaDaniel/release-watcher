@@ -119,3 +119,39 @@ func TestVerifyPushFailsClearlyWithoutPnpm(t *testing.T) {
 		t.Fatalf("verify-push still silently skips APK lint:\n%s", out)
 	}
 }
+
+func TestGitignoreProtectsSecretsAndRuntimeFiles(t *testing.T) {
+	root := repoRoot(t)
+	ignored := []string{
+		".env",
+		".env.local",
+		".env.production",
+		"telegram.env",
+		"telegram.json",
+		"release-watcher.env",
+		"state.db",
+		"state.db-wal",
+		"state.sqlite3",
+		"state.sqlite3-wal",
+		"state.sqlite3-shm",
+		".rwbackup-abc123",
+		"state.rwbackup",
+		"state.backup",
+		"debug.log",
+	}
+	for _, path := range ignored {
+		cmd := exec.Command("git", "check-ignore", "-q", path)
+		cmd.Dir = root
+		if err := cmd.Run(); err != nil {
+			t.Errorf("%s is not ignored", path)
+		}
+	}
+	visible := []string{".env.example", "testdata/atom.xml", "telegram_token_test.go"}
+	for _, path := range visible {
+		cmd := exec.Command("git", "check-ignore", "-q", path)
+		cmd.Dir = root
+		if err := cmd.Run(); err == nil {
+			t.Errorf("%s is ignored but must remain visible", path)
+		}
+	}
+}
