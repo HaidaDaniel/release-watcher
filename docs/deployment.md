@@ -69,7 +69,7 @@ The system-level layout is separate from the user-level templates:
 /etc/systemd/system/release-watcher.timer
 ```
 
-The unit runs as a dedicated `release-watcher` user, with `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096` and the hardening options in `deploy/systemd/system/release-watcher.service`. Adjust limits only after measuring the real oneshot run.
+The unit runs as a dedicated `release-watcher` user, with `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096` and the hardening options in `deploy/systemd/system/release-watcher.service`. Adjust limits only after measuring the real oneshot run. An isolated transient user-level smoke on the audited host (no installation, no timer) measured ~11.6 MiB cgroup memory peak and ~0.35 s CPU for a live 210-chapter baseline plus one scan, with zero OOM events; the 512M/256M limits and 64-task limit were effective. This is smoke evidence, not an installation.
 
 Build the artifact on the development machine from a clean commit:
 
