@@ -1,6 +1,6 @@
 # Architecture
 
-Status: the repository, CLI bootstrap, SQLite persistence, normalized Narō/RSS/Atom adapters, scan detection, the CLI vertical slice, the optional Telegram outbox, backup/restore, doctor and user systemd installation are implemented. Live deployment proof and the Whoosh spike are planned. The target shape below is intentionally small.
+Status: the repository, CLI bootstrap, SQLite persistence, normalized Narō/RSS/Atom adapters, scan detection, the CLI vertical slice, the optional Telegram outbox, backup/restore, doctor, systemd installation and a system-level NAS deployment are implemented and verified. The Whoosh spike remains planned/blocked. The target shape below is intentionally small.
 
 ## Shape
 

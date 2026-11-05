@@ -93,7 +93,7 @@ sudo systemctl enable --now release-watcher.timer
 
 ### Whoosh Core assessment for prebuilt artifacts
 
-Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git-oriented: it maintains a bare mirror and builds a release from Git on the target, and its target requirements include `git` and `tar`. Its docs do not provide a first-class prebuilt-artifact upload that replaces the build phase. That conflicts with the requirement that the NAS receives a dev-built binary and does not clone/build. The bounded fallback is the SSH/SCP release layout above (or an equivalent minimal script), not a custom deployment framework. Whoosh remains an external evaluation, not a runtime dependency. Whoosh was not used for the first deployment; the bounded SSH/SCP installer was used instead. Whoosh remains an external evaluation, not a runtime dependency.
+Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git-oriented: it maintains a bare mirror and builds a release from Git on the target, and its target requirements include `git` and `tar`. Its docs do not provide a first-class prebuilt-artifact upload that replaces the build phase. That conflicts with the requirement that the NAS receives a dev-built binary and does not clone/build. The bounded fallback is the SSH/SCP release layout above (or an equivalent minimal script), not a custom deployment framework. Whoosh was not used for the first deployment; the bounded SSH/SCP installer was used instead. Whoosh remains an external evaluation, not a runtime dependency.
 
 ## Deployed NAS acceptance (2026-11-05)
 
@@ -101,7 +101,7 @@ Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git
 - Layout: `/opt/release-watcher/releases/<commit>` + atomic `current`, state `/var/lib/release-watcher/release-watcher.db`, backups `/var/backups/release-watcher/`.
 - Runtime: dedicated unprivileged `release-watcher` user, separate system-level oneshot service and daily timer.
 - Effective limits: `MemoryMax=512M`, `MemoryHigh=256M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `LimitNOFILE=4096`. The cgroup reported `cpu.max=40000 100000`, `memory.max=536870912`, `memory.high=268435456`, `memory.swap.max=134217728`, `pids.max=64`, `io.weight=default 50`.
-- Measured service run: peak memory ~9.4 MiB, CPU ~0.16 s, 9 tasks, no OOM/high/max events. A longer isolated smoke measured ~11.6 MiB peak and ~0.63 s CPU.
+- Measured service run: peak memory ~9.4 MiB, CPU ~0.16 s, 9 tasks, no OOM/high/max events. A longer isolated smoke measured ~11.6 MiB peak and ~0.35–0.63 s CPU across runs.
 - SQLite: schema 3, ~288 KiB database; 210-chapter Narō baseline, no false events; repeated `scan --due` stayed `unchanged` with 0 events.
 - Backups: three verified `.rwbackup` files (~43 KiB each); restore was exercised on a separate smoke database copy, not on the only live database.
 - Upgrade/restore: a backup was restored into a separate test DB; the old `1d89864` binary read and scanned it, then the new `4d08eff` binary read and scanned the same DB with 0 events.
