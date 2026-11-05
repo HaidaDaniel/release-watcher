@@ -1,6 +1,6 @@
 # Task 0021 - Resource-limited systemd packaging and dev-side artifact delivery
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
