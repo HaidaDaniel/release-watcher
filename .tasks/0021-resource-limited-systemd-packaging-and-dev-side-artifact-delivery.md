@@ -1,7 +1,7 @@
 # Task 0021 - Resource-limited systemd packaging and dev-side artifact delivery
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Type: feature
@@ -27,6 +27,7 @@ Add separate system-level NAS systemd units with explicit cgroup limits and a de
 
 - deploy/**
 - scripts/**
+- tests/install/**
 - docs/**
 - README.md
 - .tasks/**
