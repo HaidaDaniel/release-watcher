@@ -26,6 +26,9 @@ Install the prebuilt artifact on the NAS under verified cgroup limits, run smoke
 ## Files allowed to edit
 
 - deploy/whoosh/**
+- internal/cli/cli.go
+- tests/foundation/doctor_test.go
+- tests/install/systemd_test.go
 - docs/**
 - README.md
 - .tasks/**
