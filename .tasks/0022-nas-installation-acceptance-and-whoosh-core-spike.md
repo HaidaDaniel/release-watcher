@@ -1,6 +1,6 @@
 # Task 0022 - NAS installation acceptance and Whoosh Core spike
 
-State: blocked
+State: todo
 Owner: none
 Mode: mvp
 Lane: deployment
