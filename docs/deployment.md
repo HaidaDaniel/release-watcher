@@ -93,7 +93,7 @@ sudo systemctl enable --now release-watcher.timer
 
 ### Whoosh Core assessment for prebuilt artifacts
 
-Whoosh Core is Git-oriented: it maintains a bare mirror and builds a release from Git on the target, and its target requirements include `git` and `tar`. Its docs do not provide a first-class prebuilt-artifact upload that replaces the build phase. That conflicts with the requirement that the NAS receives a dev-built binary and does not clone/build. The bounded fallback is the SSH/SCP release layout above (or an equivalent minimal script), not a custom deployment framework. Whoosh remains an external evaluation, not a runtime dependency.
+Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git-oriented: it maintains a bare mirror and builds a release from Git on the target, and its target requirements include `git` and `tar`. Its docs do not provide a first-class prebuilt-artifact upload that replaces the build phase. That conflicts with the requirement that the NAS receives a dev-built binary and does not clone/build. The bounded fallback is the SSH/SCP release layout above (or an equivalent minimal script), not a custom deployment framework. Whoosh remains an external evaluation, not a runtime dependency. A Whoosh live spike was not attempted because the same privileged installation prerequisite is missing.
 
 ## Configuration
 
