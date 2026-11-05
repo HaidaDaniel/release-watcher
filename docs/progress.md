@@ -29,7 +29,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Read-only, schema-aware doctor without implicit migration.
 - User-level install script and systemd service/timer installation path with a daily persistent timer, XDG rendering and explicit lingering guidance.
 - Linux amd64 and arm64 builds; static systemd verification and local binary smoke checks.
-- System-level NAS units with cgroup limits, dev-side release packaging/manifest, install/rollback and backup-prune helpers are prepared and statically verified. The installer now stages and verifies before switching current and rolls back previous current/units on failure; doctor detects system timers first and still supports user timers. They are not installed because privileged access is blocked.
+- System-level NAS units with cgroup limits, dev-side release packaging/manifest, install/rollback and backup-prune helpers are installed on the NAS. The installer stages and verifies before switching current and rolls back previous current/units on failure; doctor detects system timers first and still supports user timers.
 - A transient user-level smoke on the NAS (no installation, no timer) ran the release artifact against live Narō: baseline 210 chapters, zero false events, one unchanged scan, backup schema 3, cgroup peak ~11.6 MiB, ~0.35 s CPU, zero OOM. This is smoke evidence, not a deployment.
 - Whoosh Core was assessed at commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`; its Git-build model does not support the required prebuilt-artifact flow without fighting the tool.
 - Narō `end` mapping corrected to the official specification; unwatch preserves history and `purge` is explicit; daily persistent timer and doctor cadence check; non-leaking secret scanner and mandatory APK lint.
@@ -55,7 +55,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - MVP acceptance matrix: `go test ./...`, `go test -race ./...`, `go vet ./...`, `go build ./...`, `scripts/verify-push.sh`, `pnpm exec apkit lint`, linux/amd64 and linux/arm64 builds, release build identity, backup/restore with real data, doctor schema check, systemd unit validation, live Narō smoke, isolated E2E and JSON stdout purity.
 - Notification cancellation tests cover pending, failed, sent, remove, re-add, restart, pause and shared watches: see task 0018 evidence.
 - Scheduling regression tests cover day1 04:29 -> day2 04:18, evening add, missed days, 6h/12h/24h/48h, manual scan --all, same-window replay and Europe/Berlin DST transitions: see task 0017 evidence.
-- NAS deployment acceptance: system-level install, effective cgroup limits, SQLite persistence, service run, daily timer, backup/restore on a separate copy and rollback on a separate test root: see task 0022 evidence.
+- NAS deployment acceptance: system-level install, effective cgroup limits (`cpu.max=40000 100000`, memory/swap/pids/io), SQLite persistence, service run, daily timer, backup/restore on a separate copy, upgrade from `1d89864` to `4d08eff` on a restored test DB and rollback on a separate test root: see task 0022 evidence.
 - Signal/timeout/lock acceptance: a second concurrent scan exits 4 with a JSON `locked` error; SIGINT ends the scan with a partial-failure JSON envelope and exit 3; an external timeout terminates the process; a later run succeeds.
 
 ## Deployed
@@ -74,4 +74,4 @@ APK v0.5.2 typed 0016 as `release`, whose template asks for hosted CI, a tag and
 
 ## Next step
 
-Remaining backlog: NAS privileged installation access (dedicated user + system units), Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.
+Remaining backlog: Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.

@@ -55,7 +55,7 @@ loginctl show-user "$USER" -p Linger
 
 The installer does not enable lingering automatically; it prints the command when lingering is off. With lingering enabled, the daily timer and `Persistent=true` recover missed runs after reboot. Test this in an isolated user environment before relying on it. Use `systemctl --user list-timers release-watcher.timer` and `journalctl --user -u release-watcher.service` to diagnose scheduling.
 
-## System-level NAS layout (prepared, not installed)
+## System-level NAS layout (installed)
 
 The system-level layout is separate from the user-level templates:
 
@@ -69,7 +69,7 @@ The system-level layout is separate from the user-level templates:
 /etc/systemd/system/release-watcher.timer
 ```
 
-The unit runs as a dedicated `release-watcher` user, with `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096` and the hardening options in `deploy/systemd/system/release-watcher.service`. Adjust limits only after measuring the real oneshot run. An isolated transient user-level smoke on the audited host (no installation, no timer) measured ~11.6 MiB cgroup memory peak and ~0.35 s CPU for a live 210-chapter baseline plus one scan, with zero OOM events; the 512M/256M limits and 64-task limit were effective. This is smoke evidence, not an installation.
+The unit runs as a dedicated `release-watcher` user, with `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096` and the hardening options in `deploy/systemd/system/release-watcher.service`. Adjust limits only after measuring the real oneshot run. The installed service measured ~9.4 MiB peak and ~0.16 s CPU; an isolated transient smoke measured ~11.6 MiB peak and ~0.63 s CPU for a live 210-chapter baseline plus scans, with zero OOM events. The 512M/256M limits and 64-task limit were effective.
 
 Build the artifact on the development machine from a clean commit:
 
@@ -93,17 +93,18 @@ sudo systemctl enable --now release-watcher.timer
 
 ### Whoosh Core assessment for prebuilt artifacts
 
-Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git-oriented: it maintains a bare mirror and builds a release from Git on the target, and its target requirements include `git` and `tar`. Its docs do not provide a first-class prebuilt-artifact upload that replaces the build phase. That conflicts with the requirement that the NAS receives a dev-built binary and does not clone/build. The bounded fallback is the SSH/SCP release layout above (or an equivalent minimal script), not a custom deployment framework. Whoosh remains an external evaluation, not a runtime dependency. A Whoosh live spike was not attempted because the same privileged installation prerequisite is missing.
+Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git-oriented: it maintains a bare mirror and builds a release from Git on the target, and its target requirements include `git` and `tar`. Its docs do not provide a first-class prebuilt-artifact upload that replaces the build phase. That conflicts with the requirement that the NAS receives a dev-built binary and does not clone/build. The bounded fallback is the SSH/SCP release layout above (or an equivalent minimal script), not a custom deployment framework. Whoosh remains an external evaluation, not a runtime dependency. Whoosh was not used for the first deployment; the bounded SSH/SCP installer was used instead. Whoosh remains an external evaluation, not a runtime dependency.
 
 ## Deployed NAS acceptance (2026-11-05)
 
 - Artifact: `0.1.0`, commit `4d08eff121b691478236a5330e002460b74df1ec`, linux/amd64, SHA-256 `9f17108746380bb57bb3cbd76d104177cbced54923f694418db9de6be0b8f2ca`.
 - Layout: `/opt/release-watcher/releases/<commit>` + atomic `current`, state `/var/lib/release-watcher/release-watcher.db`, backups `/var/backups/release-watcher/`.
 - Runtime: dedicated unprivileged `release-watcher` user, separate system-level oneshot service and daily timer.
-- Effective limits: `MemoryMax=512M`, `MemoryHigh=256M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `LimitNOFILE=4096`. The cgroup reported `memory.max=536870912`, `memory.high=268435456`, `memory.swap.max=134217728`, `pids.max=64`, `io.weight=default 50`.
+- Effective limits: `MemoryMax=512M`, `MemoryHigh=256M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `LimitNOFILE=4096`. The cgroup reported `cpu.max=40000 100000`, `memory.max=536870912`, `memory.high=268435456`, `memory.swap.max=134217728`, `pids.max=64`, `io.weight=default 50`.
 - Measured service run: peak memory ~9.4 MiB, CPU ~0.16 s, 9 tasks, no OOM/high/max events. A longer isolated smoke measured ~11.6 MiB peak and ~0.63 s CPU.
 - SQLite: schema 3, ~288 KiB database; 210-chapter Narō baseline, no false events; repeated `scan --due` stayed `unchanged` with 0 events.
 - Backups: three verified `.rwbackup` files (~43 KiB each); restore was exercised on a separate smoke database copy, not on the only live database.
+- Upgrade/restore: a backup was restored into a separate test DB; the old `1d89864` binary read and scanned it, then the new `4d08eff` binary read and scanned the same DB with 0 events.
 - Rollback: `rollback-system.sh` switched a separate test root from `4d08eff` to `1d89864` and verified the embedded commit.
 - Timer: enabled with `OnCalendar=*-*-* 04:15:00`, `Persistent=true`, next run recorded by systemd; the service is oneshot and exits after each scan.
 - Telegram: `NOT_CONFIGURED`; no messages were sent.
@@ -219,4 +220,4 @@ A read-only audit of the target home NAS was performed before any installation. 
 - Recommended Release Watcher limits: `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096`. Adjust only after measuring the real oneshot run.
 - User-manager fallback cgroup probe applied MemoryMax/MemoryHigh/CPUQuota/TasksMax, but IOWeight was unavailable and lingering was disabled.
 
-Installation is **blocked** on the audited host: non-interactive sudo is unavailable, so the preferred system-level unit and dedicated runtime user cannot be created; lingering is disabled, so a user-level timer would not survive logout/reboot. No NAS service, timer, firewall, routing, or global cgroup was changed. The exact privileged actions needed are: create a dedicated system user and the `/opt/release-watcher`, `/var/lib/release-watcher`, `/var/backups/release-watcher`, `/etc/release-watcher` paths; install the system units under `/etc/systemd/system`; run `systemctl daemon-reload`; then enable the timer only after smoke.
+Installation was completed on 2026-11-05 after the operator supplied the privileged password for user creation and the installer. The timer was enabled only after smoke. No global systemd/cgroup/firewall/SSH configuration was changed. See **Deployed NAS acceptance** above for the verified result.

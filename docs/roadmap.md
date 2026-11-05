@@ -45,7 +45,7 @@ Exit: a failed Telegram request is retried and a successful event produces exact
 - systemd timer installation and docs; build linux/amd64 and linux/arm64.
 - Whoosh Core assessment and deployment spike plan/backlog.
 
-Exit: backup/restore, doctor, local binary smoke, static systemd verification and the polite Narō smoke are done. A live-schema acceptance run on a real host and the first Whoosh deployment remain separate tasks and are not claimed.
+Exit: backup/restore, doctor, local binary smoke, static systemd verification and the polite Narō smoke are done. A live-schema acceptance run on a real host is now complete; the first Whoosh deployment remains separate.
 
 ## Stage 5 — Media Core documentation (separate repository) — done
 
@@ -62,7 +62,7 @@ Exit: backup/restore, doctor, local binary smoke, static systemd verification an
 - Polite live Narō smoke, isolated E2E with Telegram outbox/retry and two-watch isolation.
 - Full acceptance matrix: tests, race, vet, builds, backup/restore, doctor, systemd, JSON purity, lock/signal/timeout.
 
-Exit: functional MVP passes locally. Deployed MVP remains blocked until a real Linux host is provided; the Whoosh spike is a separate optional deployment evaluation after that.
+Exit: functional MVP passes locally and is deployed system-level on a home NAS. The Whoosh spike remains a separate optional deployment evaluation.
 
 ## Deferred backlog
 

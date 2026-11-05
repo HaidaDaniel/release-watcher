@@ -161,10 +161,10 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 ## ADR-0022 — NAS deployment requires system-level cgroup isolation
 
 - Date: 2026-11-04
-- Status: Accepted; installation blocked on host access
+- Status: Superseded by ADR-0025 (deployment accepted)
 - Context: A read-only audit found the target NAS resource-safe (ample RAM/disk, no pressure or OOM) and cgroup v2 capable. ResLedger and the Telegram agent have their own users, cgroups and limits. The preferred Release Watcher deployment is a system-level oneshot service plus daily timer under a dedicated non-privileged user, with explicit MemoryHigh/MemoryMax/CPUQuota/TasksMax/IOWeight limits. Non-interactive sudo is unavailable on the host and user lingering is disabled.
 - Decision: Do not install a user-level fallback as a production deployment. A user-level timer would not survive logout/reboot without lingering, and the user manager does not expose IOWeight. Keep the system-level layout and limits as the deployment contract; require the operator to provide the exact privileged setup (dedicated user, `/opt/release-watcher`, `/var/lib/release-watcher`, `/var/backups/release-watcher`, `/etc/release-watcher`, system units, `daemon-reload`). Enable the timer only after smoke and cgroup verification.
-- Consequences: The host is resource-safe but deployment remains blocked until privileged access is provided. No existing service, global systemd configuration, cgroup, firewall or routing is changed. Whoosh Core remains a separate blocked spike; a bounded SSH/SCP release layout is the fallback if Whoosh cannot deliver prebuilt artifacts.
+- Consequences: The host was resource-safe; deployment was subsequently completed under ADR-0025 after the operator supplied the privileged password. No existing service, global systemd configuration, cgroup, firewall or routing was changed. Whoosh Core remains a separate blocked spike; a bounded SSH/SCP release layout is the fallback if Whoosh cannot deliver prebuilt artifacts.
 
 ## ADR-0023 — Dev-side artifact manifest and system-level packaging
 

@@ -2,7 +2,7 @@
 
 A small self-hosted watcher for new chapters and volumes from public sources. One Go binary, SQLite state, a CLI and an optional daily systemd timer (with a 24h default check interval). No server, no Docker, no LLM during scans.
 
-Status: functional MVP implemented and tested locally. Add a source, store a silent baseline, scan for new chapters, read events, use stable JSON from any agent, optionally receive grouped Telegram messages, remove a watch without losing history, and back up/restore state. The live Narō smoke and isolated E2E pass. A deployed MVP on a real Linux host is not claimed. See [docs/progress.md](docs/progress.md).
+Status: functional MVP implemented and tested locally. Add a source, store a silent baseline, scan for new chapters, read events, use stable JSON from any agent, optionally receive grouped Telegram messages, remove a watch without losing history, and back up/restore state. The live Narō smoke and isolated E2E pass. A system-level MVP is deployed on a home NAS with verified cgroup limits, SQLite, backups, timer and rollback. See [docs/progress.md](docs/progress.md).
 
 ## Build from source
 
