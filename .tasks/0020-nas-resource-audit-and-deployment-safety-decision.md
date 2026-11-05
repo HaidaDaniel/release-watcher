@@ -1,6 +1,6 @@
 # Task 0020 - NAS resource audit and deployment safety decision
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: research
