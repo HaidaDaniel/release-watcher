@@ -1,6 +1,6 @@
 # Release Watcher
 
-Status: Functional MVP implemented and tested locally. The repository foundation, SQLite persistence (schema 3), Narō/RSS/Atom adapters, scan detection, CLI vertical slice, optional durable Telegram outbox, backup/restore, read-only doctor, daily user systemd timer, unwatch/purge history semantics and Linux builds are implemented. The live Narō smoke and isolated end-to-end regression pass. A deployed MVP on a real Linux host and the Whoosh spike remain planned/blocked; this document separates those states explicitly.
+Status: Functional MVP implemented and tested locally. The repository foundation, SQLite persistence (schema 3), Narō/RSS/Atom adapters, scan detection, CLI vertical slice, optional durable Telegram outbox, backup/restore, read-only doctor, daily user systemd timer, unwatch/purge history semantics and Linux builds are implemented. The live Narō smoke and isolated end-to-end regression pass. A system-level MVP is deployed on a home NAS with verified cgroup limits, SQLite, backups, timer and rollback; the Whoosh Core spike remains blocked.
 
 ## Mission
 
@@ -52,7 +52,7 @@ release-watcher scan --due
 | systemd daily timer, user install script and lingering guidance | implemented and statically verified |
 | Live Narō smoke and isolated E2E (210→212, Telegram, retries) | tested |
 | Functional MVP acceptance matrix | tested |
-| Deployed MVP on a real Linux host | not deployed; no test host provided |
+| Deployed MVP on a real Linux host | deployed on a home NAS; cgroup/SQLite/backup/rollback/timer verified |
 | Whoosh Core deployment spike | assessed, blocked on a real test host |
 | Media Core documentation | done in separate repository (docs only) |
 

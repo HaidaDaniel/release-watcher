@@ -1,6 +1,6 @@
 # Deployment
 
-Status: local installation and recovery are implemented and statically verified; no live production deployment has been performed. The Whoosh Core deployment spike remains a separate backlog task. Nothing in this document claims a live deployment.
+Status: a system-level Release Watcher deployment has been performed on a home NAS and accepted with cgroup, SQLite, backup/restore and rollback checks. Whoosh Core was not used because its Git-build pipeline does not match the prebuilt-artifact requirement. The Whoosh comparison remains backlog.
 
 ## Runtime shape
 
@@ -94,6 +94,20 @@ sudo systemctl enable --now release-watcher.timer
 ### Whoosh Core assessment for prebuilt artifacts
 
 Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git-oriented: it maintains a bare mirror and builds a release from Git on the target, and its target requirements include `git` and `tar`. Its docs do not provide a first-class prebuilt-artifact upload that replaces the build phase. That conflicts with the requirement that the NAS receives a dev-built binary and does not clone/build. The bounded fallback is the SSH/SCP release layout above (or an equivalent minimal script), not a custom deployment framework. Whoosh remains an external evaluation, not a runtime dependency. A Whoosh live spike was not attempted because the same privileged installation prerequisite is missing.
+
+## Deployed NAS acceptance (2026-11-05)
+
+- Artifact: `0.1.0`, commit `4d08eff121b691478236a5330e002460b74df1ec`, linux/amd64, SHA-256 `9f17108746380bb57bb3cbd76d104177cbced54923f694418db9de6be0b8f2ca`.
+- Layout: `/opt/release-watcher/releases/<commit>` + atomic `current`, state `/var/lib/release-watcher/release-watcher.db`, backups `/var/backups/release-watcher/`.
+- Runtime: dedicated unprivileged `release-watcher` user, separate system-level oneshot service and daily timer.
+- Effective limits: `MemoryMax=512M`, `MemoryHigh=256M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `LimitNOFILE=4096`. The cgroup reported `memory.max=536870912`, `memory.high=268435456`, `memory.swap.max=134217728`, `pids.max=64`, `io.weight=default 50`.
+- Measured service run: peak memory ~9.4 MiB, CPU ~0.16 s, 9 tasks, no OOM/high/max events. A longer isolated smoke measured ~11.6 MiB peak and ~0.63 s CPU.
+- SQLite: schema 3, ~288 KiB database; 210-chapter Narō baseline, no false events; repeated `scan --due` stayed `unchanged` with 0 events.
+- Backups: three verified `.rwbackup` files (~43 KiB each); restore was exercised on a separate smoke database copy, not on the only live database.
+- Rollback: `rollback-system.sh` switched a separate test root from `4d08eff` to `1d89864` and verified the embedded commit.
+- Timer: enabled with `OnCalendar=*-*-* 04:15:00`, `Persistent=true`, next run recorded by systemd; the service is oneshot and exits after each scan.
+- Telegram: `NOT_CONFIGURED`; no messages were sent.
+- The smoke watch was created with a short interval to force a due scan, then changed to the default 24h. `doctor` reports `system timer cadence 24h0m0s covers the shortest enabled watch interval 24h0m0s`.
 
 ## Configuration
 

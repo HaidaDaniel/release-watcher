@@ -55,17 +55,16 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - MVP acceptance matrix: `go test ./...`, `go test -race ./...`, `go vet ./...`, `go build ./...`, `scripts/verify-push.sh`, `pnpm exec apkit lint`, linux/amd64 and linux/arm64 builds, release build identity, backup/restore with real data, doctor schema check, systemd unit validation, live Narō smoke, isolated E2E and JSON stdout purity.
 - Notification cancellation tests cover pending, failed, sent, remove, re-add, restart, pause and shared watches: see task 0018 evidence.
 - Scheduling regression tests cover day1 04:29 -> day2 04:18, evening add, missed days, 6h/12h/24h/48h, manual scan --all, same-window replay and Europe/Berlin DST transitions: see task 0017 evidence.
+- NAS deployment acceptance: system-level install, effective cgroup limits, SQLite persistence, service run, daily timer, backup/restore on a separate copy and rollback on a separate test root: see task 0022 evidence.
 - Signal/timeout/lock acceptance: a second concurrent scan exits 4 with a JSON `locked` error; SIGINT ends the scan with a partial-failure JSON envelope and exit 3; an external timeout terminates the process; a later run succeeds.
 
 ## Deployed
 
-- Deployed MVP: not deployed. The functional MVP is verified locally (see Tested), but Linux binaries were built locally; the amd64 binary was smoke-checked and ARM64 was not executed; systemd units were statically verified. No real Linux host was provided for installation, reboot/linger verification, or the Whoosh spike.
+- Release Watcher `0.1.0` at commit `4d08eff` is deployed system-level on a home NAS under the unprivileged `release-watcher` user. SQLite schema 3, verified backups, separate-copy restore and separate-root rollback passed. The daily timer is enabled (`OnCalendar=04:15`, `Persistent=true`); the oneshot service exits after each scan. Telegram is not configured. Whoosh was not used.
 
 ## Blocked
 
-- NAS deployment: read-only audit found the host resource-safe, but non-interactive sudo is unavailable and user lingering is disabled. The preferred system-level unit and dedicated runtime user cannot be created, and a user-level timer would not survive reboot. No NAS state was changed.
 - Whoosh Core live deployment: no test host; assessment documented but not executed. Task 0008 remains blocked pending a real test host and explicit deployment permission.
-- Deployed MVP: blocked on the same host/deployment prerequisite. Do not treat the local functional MVP as a production deployment.
 
 ## APK process note
 
