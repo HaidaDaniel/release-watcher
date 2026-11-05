@@ -149,3 +149,15 @@ The spike is a separate backlog task. It must record the exact Whoosh version/co
 - Do not expose a network port; there is none in the MVP.
 - Do not put tokens in command lines, URLs, logs, Git or test fixtures.
 - The SSRF guard blocks private targets by default. Do not enable `RELEASE_WATCHER_ALLOW_PRIVATE_HOSTS` in production.
+
+## NAS resource audit and isolation decision
+
+A read-only audit of the target home NAS was performed before any installation. Generalized results:
+
+- Ubuntu 24.04, systemd 255, cgroup v2 unified, 4 logical CPUs, 7.6 GiB RAM, 19 GiB swap.
+- Root filesystem had ~138 GiB free; NAS arrays had >140 GiB free. No memory/CPU/IO pressure or OOM events were observed.
+- ResLedger API/scheduler used ~25/13 MiB current with 512/256 MiB MemoryMax; the Telegram memory agent used ~280 MiB current (412 MiB peak) with a 1.5 GiB MemoryMax. All had zero restarts and zero OOM events.
+- Recommended Release Watcher limits: `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096`. Adjust only after measuring the real oneshot run.
+- User-manager fallback cgroup probe applied MemoryMax/MemoryHigh/CPUQuota/TasksMax, but IOWeight was unavailable and lingering was disabled.
+
+Installation is **blocked** on the audited host: non-interactive sudo is unavailable, so the preferred system-level unit and dedicated runtime user cannot be created; lingering is disabled, so a user-level timer would not survive logout/reboot. No NAS service, timer, firewall, routing, or global cgroup was changed. The exact privileged actions needed are: create a dedicated system user and the `/opt/release-watcher`, `/var/lib/release-watcher`, `/var/backups/release-watcher`, `/etc/release-watcher` paths; install the system units under `/etc/systemd/system`; run `systemctl daemon-reload`; then enable the timer only after smoke.

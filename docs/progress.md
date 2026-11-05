@@ -60,6 +60,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Blocked
 
+- NAS deployment: read-only audit found the host resource-safe, but non-interactive sudo is unavailable and user lingering is disabled. The preferred system-level unit and dedicated runtime user cannot be created, and a user-level timer would not survive reboot. No NAS state was changed.
 - Whoosh Core live deployment: no test host; assessment documented but not executed. Task 0008 remains blocked pending a real test host and explicit deployment permission.
 - Deployed MVP: blocked on the same host/deployment prerequisite. Do not treat the local functional MVP as a production deployment.
 
@@ -71,4 +72,4 @@ APK v0.5.2 typed 0016 as `release`, whose template asks for hosted CI, a tag and
 
 ## Next step
 
-Remaining backlog: Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.
+Remaining backlog: NAS privileged installation access (dedicated user + system units), Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.
