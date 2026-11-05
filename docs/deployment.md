@@ -7,7 +7,7 @@ Status: a system-level Release Watcher deployment has been performed on a home N
 - One statically linked (or pure-Go) binary: `release-watcher`.
 - One state directory outside the source tree, defaulting to `$XDG_DATA_HOME/release-watcher` (normally `~/.local/share/release-watcher`) or `RELEASE_WATCHER_STATE_DIR`.
 - SQLite database in that directory, secured to `0600` by the process; SQLite sidecars live in the same private directory.
-- A user-level systemd service (oneshot) and timer. No root daemon, no Docker, no PostgreSQL, no Redis.
+- A system-level oneshot service and timer, with user-level units kept as a fallback. No always-running daemon, no Docker, no PostgreSQL, no Redis.
 
 ## Build
 
@@ -69,7 +69,7 @@ The system-level layout is separate from the user-level templates:
 /etc/systemd/system/release-watcher.timer
 ```
 
-The unit runs as a dedicated `release-watcher` user, with `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096` and the hardening options in `deploy/systemd/system/release-watcher.service`. Adjust limits only after measuring the real oneshot run. The installed service measured ~9.4 MiB peak and ~0.16 s CPU; an isolated transient smoke measured ~11.6 MiB peak and ~0.63 s CPU for a live 210-chapter baseline plus scans, with zero OOM events. The 512M/256M limits and 64-task limit were effective.
+The unit runs as a dedicated `release-watcher` user, with `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096` and the hardening options in `deploy/systemd/system/release-watcher.service`. Adjust limits only after measuring the real oneshot run. The installed service measured ~9.4 MiB peak and ~0.16 s CPU; an isolated transient smoke measured ~11.6 MiB peak and ~0.35–0.63 s CPU across runs for a live 210-chapter baseline plus scans, with zero OOM events. The 512M/256M limits and 64-task limit were effective.
 
 Build the artifact on the development machine from a clean commit:
 
@@ -158,7 +158,7 @@ Restore acquires the same process lock as scans/notify, validates the archive, s
 
 ## Doctor
 
-`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings, build identity and the installed user timer cadence against the shortest enabled watch interval. It does not create or migrate the database. On a closed database it opens with `immutable=1`, so it does not create `-wal`/`-shm` sidecars; if a WAL exists it inspects a temporary copy, leaving the live files untouched. Stop writers when an authoritative schema/permission check is required.
+`release-watcher doctor --json` is read-only. It checks configuration, state/database permissions, the SQLite schema version against the binary's known migrations, optional Telegram configuration, SSRF settings, build identity and the installed timer cadence against the shortest enabled watch interval. It does not create or migrate the database. On a closed database it opens with `immutable=1`, so it does not create `-wal`/`-shm` sidecars; if a WAL exists it inspects a temporary copy, leaving the live files untouched. Stop writers when an authoritative schema/permission check is required.
 
 ## Local verification evidence
 
