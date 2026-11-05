@@ -1,7 +1,7 @@
 # Task 0022 - NAS installation acceptance and Whoosh Core spike
 
-State: doing
-Owner: opencode-primary
+State: blocked
+Owner: none
 Mode: mvp
 Lane: deployment
 Type: deployment
@@ -85,3 +85,4 @@ Install the prebuilt artifact on the NAS under verified cgroup limits, run smoke
 
 - Do not stop or restart ResLedger or Telegram agent. Do not reboot the NAS. Do not change global systemd/cgroups/firewall. If sudo or lingering is unavailable
 - stop and record the exact blocker.
+- block: Blocked before installation: non-interactive sudo is unavailable, so the system-level unit and dedicated release-watcher user cannot be created; user lingering is disabled, so a user-level timer would not survive logout/reboot. Resource audit is SAFE_TO_DEPLOY, a transient user-level smoke passed under cgroup limits, but no installation, timer enable, upgrade or rollback was performed.
