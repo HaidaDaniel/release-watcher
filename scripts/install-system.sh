@@ -6,13 +6,10 @@ umask 022
 
 usage() {
   cat >&2 <<'USAGE'
-usage: install-system.sh --artifact PATH --manifest PATH [--units-dir DIR]
-                         [--root /opt/release-watcher]
-                         [--data-root /var/lib/release-watcher]
-                         [--backup-root /var/backups/release-watcher]
-                         [--user release-watcher] [--keep 5]
+usage: install-system.sh --artifact PATH --manifest PATH [--units-dir DIR] [--keep 5]
 
-Installs only Release Watcher paths and units. It does not enable the timer.
+Installs only Release Watcher paths and units. Paths and the runtime user are
+fixed to match deploy/systemd/system. It does not enable the timer.
 USAGE
   exit 2
 }
@@ -31,10 +28,6 @@ while [[ $# -gt 0 ]]; do
     --artifact) artifact=${2:?}; shift 2 ;;
     --manifest) manifest=${2:?}; shift 2 ;;
     --units-dir) units_dir=${2:?}; shift 2 ;;
-    --root) root=${2:?}; shift 2 ;;
-    --data-root) data_root=${2:?}; shift 2 ;;
-    --backup-root) backup_root=${2:?}; shift 2 ;;
-    --user) runtime_user=${2:?}; shift 2 ;;
     --keep) keep=${2:?}; shift 2 ;;
     -h|--help) usage ;;
     *) usage ;;
@@ -43,10 +36,6 @@ done
 
 [[ $(id -u) -eq 0 ]] || { echo 'install-system: must run as root' >&2; exit 1; }
 [[ -f $artifact && -f $manifest ]] || { echo 'install-system: artifact and manifest are required' >&2; exit 1; }
-[[ $root == /* && $root != *..* && $root != *//* ]] || { echo 'install-system: invalid root' >&2; exit 1; }
-[[ $data_root == /* && $data_root != *..* && $data_root != *//* ]] || { echo 'install-system: invalid data root' >&2; exit 1; }
-[[ $backup_root == /* && $backup_root != *..* && $backup_root != *//* ]] || { echo 'install-system: invalid backup root' >&2; exit 1; }
-[[ $runtime_user =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'install-system: invalid user' >&2; exit 1; }
 [[ $keep =~ ^[0-9]+$ && $keep -ge 2 ]] || { echo 'install-system: --keep must be at least 2' >&2; exit 1; }
 if [[ -z $units_dir ]]; then
   units_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../deploy/systemd/system" && pwd)
@@ -114,6 +103,10 @@ fi
 
 install -m 0755 -o root -g root "$artifact" "$release_dir/release-watcher"
 install -m 0644 -o root -g root "$manifest" "$release_dir/manifest.json"
+
+live=$("$release_dir/release-watcher" version --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["commit"])')
+[[ $live == "$commit" ]] || { echo "install-system: binary commit $live != $commit" >&2; exit 1; }
+
 tmp_link="$root/.current.$$"
 ln -sfn "$release_dir" "$tmp_link"
 mv -Tf "$tmp_link" "$root/current"
@@ -122,9 +115,6 @@ install -m 0644 -o root -g root "$units_dir/release-watcher.service" /etc/system
 install -m 0644 -o root -g root "$units_dir/release-watcher.timer" /etc/systemd/system/release-watcher.timer
 systemctl daemon-reload
 systemd-analyze verify /etc/systemd/system/release-watcher.service /etc/systemd/system/release-watcher.timer
-
-live=$("$root/current/release-watcher" version --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["commit"])')
-[[ $live == "$commit" ]] || { echo "install-system: live commit $live != $commit" >&2; exit 1; }
 
 # Keep the newest releases, but never remove the current target.
 current_real=$(readlink -f "$root/current")

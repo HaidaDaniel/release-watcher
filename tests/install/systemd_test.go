@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func repoRoot(t *testing.T) string {
@@ -244,6 +245,38 @@ func TestSystemLevelUnitsAndPackagingScripts(t *testing.T) {
 		}
 		if strings.Contains(string(output), "ignoring:") {
 			t.Fatalf("systemd-analyze warnings:\n%s", output)
+		}
+	}
+}
+
+func TestPruneBackupsKeepsVerifiedAndNewest(t *testing.T) {
+	root := repoRoot(t)
+	dir := t.TempDir()
+	names := []string{"b1.rwbackup", "b2.rwbackup", "b3.rwbackup", "b4.rwbackup", "b5.rwbackup"}
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i, name := range names {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, base.Add(time.Duration(i)*time.Hour), base.Add(time.Duration(i)*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	verified := filepath.Join(dir, "b1.rwbackup")
+	cmd := exec.Command("bash", filepath.Join(root, "scripts", "prune-backups.sh"),
+		"--dir", dir, "--keep", "2", "--verified", verified, "--apply")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("prune-backups: %v\n%s", err, output)
+	}
+	for _, name := range []string{"b1.rwbackup", "b4.rwbackup", "b5.rwbackup"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("%s should be kept: %v", name, err)
+		}
+	}
+	for _, name := range []string{"b2.rwbackup", "b3.rwbackup"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s should be removed", name)
 		}
 	}
 }

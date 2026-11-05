@@ -29,7 +29,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Read-only, schema-aware doctor without implicit migration.
 - User-level install script and systemd service/timer installation path with a daily persistent timer, XDG rendering and explicit lingering guidance.
 - Linux amd64 and arm64 builds; static systemd verification and local binary smoke checks.
-- System-level NAS units with cgroup limits, dev-side release packaging/manifest and install/rollback helpers are prepared and statically verified. They are not installed because privileged access is blocked.
+- System-level NAS units with cgroup limits, dev-side release packaging/manifest, install/rollback and backup-prune helpers are prepared and statically verified. They are not installed because privileged access is blocked.
 - Narō `end` mapping corrected to the official specification; unwatch preserves history and `purge` is explicit; daily persistent timer and doctor cadence check; non-leaking secret scanner and mandatory APK lint.
 - Calendar-aware day scheduling prevents daily timer jitter/DST from skipping a day while preserving 6h/12h/24h/48h intervals.
 - `remove` cancels that watch's pending/failed deliveries atomically; canceled deliveries never send after restart or re-add, while pause does not cancel.

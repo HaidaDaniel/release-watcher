@@ -63,21 +63,28 @@ artifact="$out_dir/release-watcher-linux-$arch"
 [[ -x $artifact ]] || { echo "package-release: missing artifact $artifact" >&2; exit 1; }
 sha256=$(sha256sum "$artifact" | awk '{print $1}')
 bytes=$(stat -c %s "$artifact")
-goarch=$(uname -m)
-case "$goarch" in x86_64) goarch=amd64 ;; aarch64) goarch=arm64 ;; esac
+host_arch=$(uname -m)
+case "$host_arch" in x86_64) host_arch=amd64 ;; aarch64|arm64) host_arch=arm64 ;; esac
+identity_probe=skipped-cross-arch
+if [[ $host_arch == "$arch" ]]; then
+  identity_probe=executed
+fi
 
-python3 - "$artifact" "$version" "$commit" "$built_at" "$sha256" "$bytes" "$arch" <<'PY'
+python3 - "$artifact" "$version" "$commit" "$built_at" "$sha256" "$bytes" "$arch" "$identity_probe" <<'PY'
 import json, os, subprocess, sys
-artifact, version, commit, built_at, sha256, size, arch = sys.argv[1:]
-out = subprocess.check_output([artifact, "version", "--json"], text=True)
-doc = json.loads(out)
-data = doc.get("data", {})
-want = {"version": version, "commit": commit, "built_at": built_at, "build_mode": "release"}
-for key, value in want.items():
-    if data.get(key) != value:
-        raise SystemExit(f"package-release: binary {key}={data.get(key)!r}, want {value!r}")
-if data.get("go_version") is None:
-    raise SystemExit("package-release: binary has no Go version")
+artifact, version, commit, built_at, sha256, size, arch, identity_probe = sys.argv[1:]
+if identity_probe == "executed":
+    out = subprocess.check_output([artifact, "version", "--json"], text=True)
+    doc = json.loads(out)
+    data = doc.get("data", {})
+    want = {"version": version, "commit": commit, "built_at": built_at, "build_mode": "release"}
+    for key, value in want.items():
+        if data.get(key) != value:
+            raise SystemExit(f"package-release: binary {key}={data.get(key)!r}, want {value!r}")
+    if data.get("go_version") is None:
+        raise SystemExit("package-release: binary has no Go version")
+else:
+    print("package-release: cross-arch build; skipping execution identity probe")
 manifest = {
     "format": "release-watcher-artifact",
     "format_version": 1,
@@ -87,6 +94,7 @@ manifest = {
     "goos": "linux",
     "goarch": arch,
     "built_at": built_at,
+    "identity_probe": identity_probe,
     "artifact": os.path.basename(artifact),
     "sha256": sha256,
     "bytes": int(size),
