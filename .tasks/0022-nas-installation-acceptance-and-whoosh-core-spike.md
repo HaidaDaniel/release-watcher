@@ -36,7 +36,10 @@ Install the prebuilt artifact on the NAS under verified cgroup limits, run smoke
 
 ## Files forbidden to edit
 
-- internal/**
+- internal/app/**
+- internal/store/**
+- internal/source/**
+- internal/notifier/**
 - cmd/**
 - migrations/**
 - deploy/systemd/system/**
