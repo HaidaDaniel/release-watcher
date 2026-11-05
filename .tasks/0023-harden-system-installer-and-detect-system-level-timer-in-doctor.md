@@ -1,6 +1,6 @@
 # Task 0023 - Harden system installer and detect system-level timer in doctor
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: implementation
