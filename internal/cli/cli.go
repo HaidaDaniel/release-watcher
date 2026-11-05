@@ -394,7 +394,7 @@ func (r *runner) doctor(ctx context.Context, args []string) int {
 	}
 
 	minInterval, enabledWatches, watchErr := store.InspectWatchIntervals(ctx, cfg.DBPath)
-	timerPath, timerCadence, timerFound, timerKnown := findUserTimer(r.getenv)
+	timerPath, timerCadence, timerFound, timerKnown, timerScope := findTimer(r.getenv)
 	switch {
 	case watchErr != nil && os.IsNotExist(watchErr):
 		add("schedule", "warn", "database is not initialized yet; timer cadence cannot be compared with watch intervals")
@@ -403,15 +403,15 @@ func (r *runner) doctor(ctx context.Context, args []string) int {
 	case enabledWatches == 0:
 		add("schedule", "ok", "no enabled watches; timer cadence does not constrain scans")
 	case !timerFound:
-		add("schedule", "warn", "user timer unit was not found; install it with scripts/install.sh --enable")
+		add("schedule", "warn", "timer unit was not found in system or user paths; install it with scripts/install-system.sh or scripts/install.sh")
 	case !timerKnown:
-		add("schedule", "warn", "cannot determine timer cadence from "+timerPath+"; edit OnCalendar or check systemd overrides")
+		add("schedule", "warn", fmt.Sprintf("cannot determine %s timer cadence from %s; edit OnCalendar or check systemd overrides", timerScope, timerPath))
 	default:
 		shortest := time.Duration(minInterval) * time.Second
 		if shortest < timerCadence {
-			add("schedule", "warn", fmt.Sprintf("timer runs every %s but the shortest enabled watch interval is %s; edit OnCalendar and reload the timer", timerCadence, shortest))
+			add("schedule", "warn", fmt.Sprintf("%s timer runs every %s but the shortest enabled watch interval is %s; edit OnCalendar and reload the timer", timerScope, timerCadence, shortest))
 		} else {
-			add("schedule", "ok", fmt.Sprintf("timer cadence %s covers the shortest enabled watch interval %s", timerCadence, shortest))
+			add("schedule", "ok", fmt.Sprintf("%s timer cadence %s covers the shortest enabled watch interval %s", timerScope, timerCadence, shortest))
 		}
 	}
 
@@ -442,8 +442,17 @@ func (r *runner) doctor(ctx context.Context, args []string) int {
 	return ExitOK
 }
 
-func findUserTimer(getenv func(string) string) (path string, cadence time.Duration, found, known bool) {
-	dirs := systemdUserUnitDirs(getenv)
+func findTimer(getenv func(string) string) (path string, cadence time.Duration, found, known bool, scope string) {
+	if path, cadence, found, known = findTimerInDirs(systemdSystemUnitDirs(getenv)); found {
+		return path, cadence, found, known, "system"
+	}
+	if path, cadence, found, known = findTimerInDirs(systemdUserUnitDirs(getenv)); found {
+		return path, cadence, found, known, "user"
+	}
+	return "", 0, false, false, ""
+}
+
+func findTimerInDirs(dirs []string) (path string, cadence time.Duration, found, known bool) {
 	var mainPath, mainContent string
 	for _, dir := range dirs {
 		candidate := filepath.Join(dir, "release-watcher.timer")
@@ -487,6 +496,25 @@ func findUserTimer(getenv func(string) string) (path string, cadence time.Durati
 	}
 	duration, ok := parseTimerCadence(content)
 	return mainPath, duration, true, ok
+}
+
+func systemdSystemUnitDirs(getenv func(string) string) []string {
+	if raw := strings.TrimSpace(getenv("RELEASE_WATCHER_SYSTEMD_SYSTEM_DIRS")); raw != "" {
+		var dirs []string
+		for _, dir := range strings.Split(raw, ":") {
+			if strings.TrimSpace(dir) != "" {
+				dirs = append(dirs, dir)
+			}
+		}
+		return dirs
+	}
+	return []string{
+		"/etc/systemd/system",
+		"/run/systemd/system",
+		"/usr/local/lib/systemd/system",
+		"/usr/lib/systemd/system",
+		"/lib/systemd/system",
+	}
 }
 
 func systemdUserUnitDirs(getenv func(string) string) []string {

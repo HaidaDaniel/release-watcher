@@ -42,7 +42,7 @@ systemctl --user daemon-reload
 systemctl --user restart release-watcher.timer
 ```
 
-There is no promise that a 6h interval is honored by a daily timer. The timer frequency is part of the installation contract. `release-watcher doctor --json` reads the installed user timer, including `release-watcher.timer.d/*.conf` drop-ins, and warns when its cadence is slower than the shortest enabled watch interval, or when the timer unit cannot be found or parsed. Supported calendar forms include aliases (`hourly`, `daily`, `weekly`), daily clock times, hour/minute steps and weekday-prefixed schedules.
+There is no promise that a 6h interval is honored by a daily timer. The timer frequency is part of the installation contract. `release-watcher doctor --json` reads the installed system timer first (`/etc/systemd/system` and the standard system unit paths, including `release-watcher.timer.d/*.conf` drop-ins), then the user timer. It reports the detected scope and warns when the cadence is slower than the shortest enabled watch interval, or when no timer can be found or parsed. The `RELEASE_WATCHER_SYSTEMD_SYSTEM_DIRS` environment variable is a test/dev override for the system unit search path; normal installs do not need it. Supported calendar forms include aliases (`hourly`, `daily`, `weekly`), daily clock times, hour/minute steps and weekday-prefixed schedules.
 
 ### User lingering and reboot recovery
 
@@ -89,7 +89,7 @@ sudo systemctl start release-watcher.service   # smoke
 sudo systemctl enable --now release-watcher.timer
 ```
 
-`install-system.sh` validates the manifest/checksum/architecture, verifies the binary build identity before switching `current`, creates only Release Watcher paths and user, installs the units, runs `systemd-analyze verify`, switches `current` atomically and keeps the newest `--keep` releases (default 5, minimum 2, never the current target). It does not start or enable the timer. `rollback-system.sh --commit <sha>` switches back to an installed release and verifies its build identity; if the database schema changed, restore a compatible pre-upgrade backup first. Backups are not pruned by the installer. Use `scripts/prune-backups.sh --dir /var/backups/release-watcher --keep 7 --verified <last-verified.rwbackup>` (dry-run by default; add `--apply`) so the last verified backup is never deleted.
+`install-system.sh` validates the manifest/checksum/architecture, stages the binary, verifies its build identity and verifies the units with `systemd-analyze` before switching `current`. It backs up the previous `current` symlink and unit files; any later install failure restores them. It creates only Release Watcher paths and user, installs the units, switches `current` atomically and keeps the newest `--keep` releases (default 5, minimum 2, never the current target). It does not start or enable the timer. `rollback-system.sh --commit <sha>` switches back to an installed release and verifies its build identity; if the database schema changed, restore a compatible pre-upgrade backup first. Backups are not pruned by the installer. Use `scripts/prune-backups.sh --dir /var/backups/release-watcher --keep 7 --verified <last-verified.rwbackup>` (dry-run by default; add `--apply`) so the last verified backup is never deleted.
 
 ### Whoosh Core assessment for prebuilt artifacts
 

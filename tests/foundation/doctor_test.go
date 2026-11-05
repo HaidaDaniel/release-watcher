@@ -82,6 +82,7 @@ func TestDoctorWarnsWhenTimerIsSlowerThanWatchInterval(t *testing.T) {
 		"RELEASE_WATCHER_MAX_RETRIES":         "0",
 		"RELEASE_WATCHER_LOG_LEVEL":           "error",
 		"XDG_CONFIG_HOME":                     configHome,
+		"RELEASE_WATCHER_SYSTEMD_SYSTEM_DIRS": t.TempDir(),
 	}
 	if code, stdout, stderr := run(t, env, "add", feed.URL+"/feed.xml", "--interval", "6h", "--json"); code != 0 {
 		t.Fatalf("add exit %d: %s %s", code, stdout, stderr)
@@ -140,6 +141,7 @@ func TestDoctorScheduleCadenceParsing(t *testing.T) {
 		"RELEASE_WATCHER_MAX_RETRIES":         "0",
 		"RELEASE_WATCHER_LOG_LEVEL":           "error",
 		"XDG_CONFIG_HOME":                     configHome,
+		"RELEASE_WATCHER_SYSTEMD_SYSTEM_DIRS": t.TempDir(),
 	}
 	if code, stdout, stderr := run(t, env, "add", feed.URL+"/feed.xml", "--interval", "6h", "--json"); code != 0 {
 		t.Fatalf("add exit %d: %s %s", code, stdout, stderr)
@@ -196,6 +198,9 @@ func TestDoctorScheduleCadenceParsing(t *testing.T) {
 			if !strings.Contains(message, tc.message) {
 				t.Fatalf("schedule message = %q, want it to mention %q", message, tc.message)
 			}
+			if !strings.Contains(message, "user timer") {
+				t.Fatalf("schedule message = %q, want user scope", message)
+			}
 		})
 	}
 }
@@ -225,4 +230,45 @@ func doctorSchedule(t *testing.T, env map[string]string) (string, string) {
 	}
 	t.Fatal("doctor did not report a schedule check")
 	return "", ""
+}
+
+func TestDoctorPrefersSystemTimerOverUserTimer(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><rss version="2.0"><channel><title>Fixture</title><item><title>One</title><link>https://example.test/1</link><guid>1</guid><pubDate>Mon, 02 Nov 2026 10:00:00 GMT</pubDate></item></channel></rss>`))
+	}))
+	defer feed.Close()
+
+	state := t.TempDir()
+	configHome := t.TempDir()
+	systemDir := t.TempDir()
+	env := map[string]string{
+		"RELEASE_WATCHER_STATE_DIR":           state,
+		"RELEASE_WATCHER_ALLOW_PRIVATE_HOSTS": "true",
+		"RELEASE_WATCHER_RATE_INTERVAL":       "0s",
+		"RELEASE_WATCHER_MAX_RETRIES":         "0",
+		"RELEASE_WATCHER_LOG_LEVEL":           "error",
+		"XDG_CONFIG_HOME":                     configHome,
+		"RELEASE_WATCHER_SYSTEMD_SYSTEM_DIRS": systemDir,
+	}
+	if code, stdout, stderr := run(t, env, "add", feed.URL+"/feed.xml", "--interval", "6h", "--json"); code != 0 {
+		t.Fatalf("add exit %d: %s %s", code, stdout, stderr)
+	}
+	userDir := filepath.Join(configHome, "systemd", "user")
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(userDir, "release-watcher.timer"), []byte("[Timer]\nOnCalendar=hourly\nPersistent=true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(systemDir, "release-watcher.timer"), []byte("[Timer]\nOnCalendar=*-*-* 04:15:00\nPersistent=true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	status, message := doctorSchedule(t, env)
+	if status != "warn" {
+		t.Fatalf("schedule status = %q, want warn", status)
+	}
+	if !strings.Contains(message, "system timer") || !strings.Contains(message, "24h") {
+		t.Fatalf("schedule message = %q, want system timer 24h", message)
+	}
 }

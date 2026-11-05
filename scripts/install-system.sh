@@ -45,6 +45,7 @@ fi
   exit 1
 }
 command -v python3 >/dev/null || { echo 'install-system: python3 is required for manifest validation' >&2; exit 1; }
+command -v systemd-analyze >/dev/null || { echo 'install-system: systemd-analyze is required' >&2; exit 1; }
 
 read -r commit version goarch <<<"$(python3 - "$manifest" "$artifact" <<'PY'
 import hashlib, json, os, sys
@@ -76,6 +77,11 @@ machine=$(uname -m)
 case "$machine" in x86_64) machine=amd64 ;; aarch64|arm64) machine=arm64 ;; esac
 [[ $machine == "$goarch" ]] || { echo "install-system: artifact is $goarch, host is $machine" >&2; exit 1; }
 
+if [[ -e $root/current && ! -L $root/current ]]; then
+  echo "install-system: $root/current exists but is not a symlink" >&2
+  exit 1
+fi
+
 if ! getent group "$runtime_user" >/dev/null; then
   groupadd --system "$runtime_user"
 fi
@@ -83,9 +89,7 @@ if ! id -u "$runtime_user" >/dev/null 2>&1; then
   useradd --system --gid "$runtime_user" --home-dir "$data_root" --shell /usr/sbin/nologin "$runtime_user"
 fi
 
-release_dir="$root/releases/$commit"
 install -d -m 0755 -o root -g root "$root" "$root/releases" "$root/shared"
-install -d -m 0755 -o root -g root "$release_dir"
 install -d -m 0700 -o "$runtime_user" -g "$runtime_user" "$data_root" "$backup_root"
 install -d -m 0755 -o root -g root /etc/release-watcher
 if [[ ! -e /etc/release-watcher/environment ]]; then
@@ -101,34 +105,106 @@ ENV
   chmod 0600 /etc/release-watcher/environment
 fi
 
-install -m 0755 -o root -g root "$artifact" "$release_dir/release-watcher"
-install -m 0644 -o root -g root "$manifest" "$release_dir/manifest.json"
+staging=$(mktemp -d "$root/.staging.XXXXXX")
+backup_dir=$(mktemp -d)
+previous_current=""
+previous_service=0
+previous_timer=0
+units_changed=0
+current_changed=0
+release_dir="$root/releases/$commit"
 
-live=$("$release_dir/release-watcher" version --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["commit"])')
+cleanup() {
+  local rc=$?
+  set +e
+  if [[ $rc -ne 0 ]]; then
+    if [[ $units_changed -eq 1 ]]; then
+      if [[ $previous_service -eq 1 ]]; then
+        cp -a "$backup_dir/release-watcher.service" /etc/systemd/system/release-watcher.service
+      else
+        rm -f /etc/systemd/system/release-watcher.service
+      fi
+      if [[ $previous_timer -eq 1 ]]; then
+        cp -a "$backup_dir/release-watcher.timer" /etc/systemd/system/release-watcher.timer
+      else
+        rm -f /etc/systemd/system/release-watcher.timer
+      fi
+      systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    if [[ $current_changed -eq 1 ]]; then
+      if [[ -n $previous_current ]]; then
+        tmp_link="$root/.current.rollback.$$"
+        ln -sfn "$previous_current" "$tmp_link" && mv -Tf "$tmp_link" "$root/current"
+      else
+        rm -f "$root/current"
+      fi
+    fi
+    echo "install-system: failed; restored previous current/units" >&2
+  fi
+  rm -rf -- "$staging" "$backup_dir"
+  exit "$rc"
+}
+trap cleanup EXIT
+
+install -m 0755 -o root -g root "$artifact" "$staging/release-watcher"
+install -m 0644 -o root -g root "$manifest" "$staging/manifest.json"
+
+live=$("$staging/release-watcher" version --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["commit"])')
 [[ $live == "$commit" ]] || { echo "install-system: binary commit $live != $commit" >&2; exit 1; }
+
+verify_units="$staging/units"
+install -d -m 0755 "$verify_units"
+sed "s|ExecStart=/opt/release-watcher/current/release-watcher|ExecStart=$staging/release-watcher|" \
+  "$units_dir/release-watcher.service" > "$verify_units/release-watcher.service"
+cp "$units_dir/release-watcher.timer" "$verify_units/release-watcher.timer"
+systemd-analyze verify "$verify_units/release-watcher.service" "$verify_units/release-watcher.timer"
+
+install -d -m 0755 -o root -g root "$release_dir"
+install -m 0755 -o root -g root "$staging/release-watcher" "$release_dir/release-watcher"
+install -m 0644 -o root -g root "$staging/manifest.json" "$release_dir/manifest.json"
+
+if [[ -L $root/current ]]; then
+  previous_current=$(readlink -f "$root/current" 2>/dev/null || readlink "$root/current")
+fi
+if [[ -f /etc/systemd/system/release-watcher.service ]]; then
+  cp -a /etc/systemd/system/release-watcher.service "$backup_dir/release-watcher.service"
+  previous_service=1
+fi
+if [[ -f /etc/systemd/system/release-watcher.timer ]]; then
+  cp -a /etc/systemd/system/release-watcher.timer "$backup_dir/release-watcher.timer"
+  previous_timer=1
+fi
 
 tmp_link="$root/.current.$$"
 ln -sfn "$release_dir" "$tmp_link"
 mv -Tf "$tmp_link" "$root/current"
+current_changed=1
 
+units_changed=1
 install -m 0644 -o root -g root "$units_dir/release-watcher.service" /etc/systemd/system/release-watcher.service
 install -m 0644 -o root -g root "$units_dir/release-watcher.timer" /etc/systemd/system/release-watcher.timer
 systemctl daemon-reload
 systemd-analyze verify /etc/systemd/system/release-watcher.service /etc/systemd/system/release-watcher.timer
 
-# Keep the newest releases, but never remove the current target.
-current_real=$(readlink -f "$root/current")
-mapfile -t releases < <(find "$root/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | awk '{print $2}')
-kept=0
-for release in "${releases[@]}"; do
-  if [[ $kept -lt $keep ]]; then
-    kept=$((kept + 1))
-    continue
-  fi
-  [[ $release == "$current_real" ]] && continue
-  [[ $release == "$root/releases/"* ]] || continue
-  rm -rf -- "$release"
-done
+# Keep the newest releases, but never remove the current target. Pruning is
+# best-effort: a pruning failure must not roll back a successful install.
+if ! (
+  set +e
+  current_real=$(readlink -f "$root/current")
+  mapfile -d '' -t releases < <(find "$root/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\0' | sort -z -rn | cut -z -d' ' -f2-)
+  kept=0
+  for release in "${releases[@]}"; do
+    if [[ $kept -lt $keep ]]; then
+      kept=$((kept + 1))
+      continue
+    fi
+    [[ $release == "$current_real" ]] && continue
+    [[ $release == "$root/releases/"* ]] || continue
+    rm -rf -- "$release" || exit 1
+  done
+); then
+  echo 'install-system: warning: release pruning failed; current release is intact' >&2
+fi
 
 echo "install-system: installed $commit ($version) at $release_dir"
 echo "install-system: current -> $root/current"

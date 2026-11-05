@@ -312,3 +312,35 @@ func TestPruneBackupsCanonicalizesVerifiedPath(t *testing.T) {
 		t.Fatalf("verified target was deleted: %v", err)
 	}
 }
+
+func TestSystemInstallerVerifiesBeforeSwitchAndHasRollback(t *testing.T) {
+	root := repoRoot(t)
+	script, err := os.ReadFile(filepath.Join(root, "scripts", "install-system.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	versionIdx := strings.Index(text, `"$staging/release-watcher" version --json`)
+	verifyIdx := strings.Index(text, `systemd-analyze verify "$verify_units/release-watcher.service"`)
+	switchIdx := strings.LastIndex(text, `mv -Tf "$tmp_link" "$root/current"`)
+	if versionIdx < 0 || verifyIdx < 0 || switchIdx < 0 {
+		t.Fatalf("installer is missing a verification or switch step")
+	}
+	if versionIdx > switchIdx {
+		t.Fatal("installer switches current before verifying the binary")
+	}
+	if verifyIdx > switchIdx {
+		t.Fatal("installer switches current before verifying units")
+	}
+	for _, want := range []string{
+		"trap cleanup EXIT",
+		"restored previous current/units",
+		"previous_service",
+		"previous_timer",
+		"previous_current",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("installer rollback missing %q", want)
+		}
+	}
+}
