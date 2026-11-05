@@ -22,12 +22,14 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n $dir && $dir == /* && $dir != *..* && $dir != *//* ]] || { echo 'prune-backups: invalid --dir' >&2; exit 1; }
 [[ -d $dir ]] || { echo 'prune-backups: directory not found' >&2; exit 1; }
+dir=$(readlink -f -- "$dir")
 [[ $keep =~ ^[0-9]+$ && $keep -ge 2 ]] || { echo 'prune-backups: --keep must be at least 2' >&2; exit 1; }
 if [[ -n $verified ]]; then
   [[ -f $verified ]] || { echo 'prune-backups: verified backup not found' >&2; exit 1; }
+  verified=$(readlink -f -- "$verified")
 fi
 
-mapfile -t files < <(find "$dir" -maxdepth 1 -type f -name '*.rwbackup' -printf '%T@ %p\n' | sort -rn | awk '{print $2}')
+mapfile -d '' -t files < <(find "$dir" -maxdepth 1 -type f -name '*.rwbackup' -printf '%T@ %p\0' | sort -z -rn | cut -z -d' ' -f2-)
 kept=0
 for file in "${files[@]}"; do
   if [[ $kept -lt $keep ]]; then

@@ -126,13 +126,18 @@ Secrets are never logged and never stored in SQLite.
 
 The binary provides a single-file, readable backup archive containing a manifest (format version, schema version, app version, size, SHA-256) and a consistent `VACUUM INTO` SQLite copy.
 
+System-level deployment:
+
 ```sh
-release-watcher backup --out /var/backups/release-watcher.rwbackup
-# before upgrading or restoring, stop the timer and other commands
-systemctl --user stop release-watcher.timer
-release-watcher restore --in /var/backups/release-watcher.rwbackup --force
-systemctl --user start release-watcher.timer
+sudo systemctl stop release-watcher.timer
+sudo -u release-watcher /opt/release-watcher/current/release-watcher backup \
+  --out "/var/backups/release-watcher/release-watcher-$(date -u +%Y%m%dT%H%M%SZ).rwbackup"
+sudo -u release-watcher /opt/release-watcher/current/release-watcher restore \
+  --in /var/backups/release-watcher/<file>.rwbackup --force
+sudo systemctl start release-watcher.timer
 ```
+
+User-level deployment uses the same commands with `systemctl --user` and the user-level paths. Backup files live in the retained directory; `scripts/prune-backups.sh` must run as root or as the `release-watcher` user and keeps the last verified file even when it is older than the retention window.
 
 Restore acquires the same process lock as scans/notify, validates the archive, size and hash, inspects the schema read-only, and refuses a schema newer than the binary. Replacement is staged in the database directory and the previous database is kept aside until the new file is in place. `--force` is required when a database already exists. Run a backup before every upgrade.
 

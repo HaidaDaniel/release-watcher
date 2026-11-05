@@ -1,6 +1,7 @@
 package install_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -278,5 +279,36 @@ func TestPruneBackupsKeepsVerifiedAndNewest(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
 			t.Errorf("%s should be removed", name)
 		}
+	}
+}
+
+func TestPruneBackupsCanonicalizesVerifiedPath(t *testing.T) {
+	root := repoRoot(t)
+	dir := filepath.Join(t.TempDir(), "backups with space")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := 1; i <= 4; i++ {
+		name := filepath.Join(dir, fmt.Sprintf("b%d.rwbackup", i))
+		if err := os.WriteFile(name, []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(name, base.Add(time.Duration(i)*time.Hour), base.Add(time.Duration(i)*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	link := filepath.Join(dir, "verified-link.rwbackup")
+	if err := os.Symlink("b1.rwbackup", link); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("bash", filepath.Join(root, "scripts", "prune-backups.sh"),
+		"--dir", dir, "--keep", "2", "--verified", link, "--apply")
+	cmd.Dir = dir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("prune-backups: %v\n%s", err, output)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "b1.rwbackup")); err != nil {
+		t.Fatalf("verified target was deleted: %v", err)
 	}
 }
