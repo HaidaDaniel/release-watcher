@@ -157,3 +157,93 @@ func TestInstallScriptHonorsXDGDataAndSpecialPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestSystemLevelUnitsAndPackagingScripts(t *testing.T) {
+	root := repoRoot(t)
+	servicePath := filepath.Join(root, "deploy", "systemd", "system", "release-watcher.service")
+	timerPath := filepath.Join(root, "deploy", "systemd", "system", "release-watcher.timer")
+	service, err := os.ReadFile(servicePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	timer, err := os.ReadFile(timerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serviceText := string(service)
+	for _, want := range []string{
+		"User=release-watcher",
+		"Group=release-watcher",
+		"ExecStart=/opt/release-watcher/current/release-watcher scan --due --json",
+		"StateDirectory=release-watcher",
+		"MemoryAccounting=yes",
+		"MemoryHigh=256M",
+		"MemoryMax=512M",
+		"MemorySwapMax=128M",
+		"CPUAccounting=yes",
+		"CPUQuota=40%",
+		"CPUWeight=50",
+		"TasksAccounting=yes",
+		"TasksMax=64",
+		"IOAccounting=yes",
+		"IOWeight=50",
+		"Nice=10",
+		"IOSchedulingClass=idle",
+		"TimeoutStartSec=15min",
+		"LimitNOFILE=4096",
+		"NoNewPrivileges=yes",
+		"PrivateTmp=yes",
+		"ProtectSystem=strict",
+		"ProtectHome=yes",
+		"RestrictSUIDSGID=yes",
+		"RestrictRealtime=yes",
+	} {
+		if !strings.Contains(serviceText, want) {
+			t.Fatalf("system service missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		"OnCalendar=*-*-* 04:15:00",
+		"Persistent=true",
+		"RandomizedDelaySec=15m",
+		"WantedBy=timers.target",
+	} {
+		if !strings.Contains(string(timer), want) {
+			t.Fatalf("system timer missing %q", want)
+		}
+	}
+	for _, script := range []string{"scripts/package-release.sh", "scripts/install-system.sh", "scripts/rollback-system.sh"} {
+		cmd := exec.Command("bash", "-n", filepath.Join(root, script))
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%s syntax: %v\n%s", script, err, output)
+		}
+	}
+
+	if _, err := exec.LookPath("systemd-analyze"); err == nil {
+		tmp := t.TempDir()
+		fakeBin := filepath.Join(tmp, "release-watcher")
+		if err := os.WriteFile(fakeBin, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		serviceCopy := strings.ReplaceAll(serviceText, "/opt/release-watcher/current/release-watcher", fakeBin)
+		serviceCopy = strings.ReplaceAll(serviceCopy, "User=release-watcher", "User=root")
+		serviceCopy = strings.ReplaceAll(serviceCopy, "Group=release-watcher", "Group=root")
+		if err := os.WriteFile(filepath.Join(tmp, "release-watcher.service"), []byte(serviceCopy), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(tmp, "release-watcher.timer"), timer, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.Command("systemd-analyze", "verify",
+			filepath.Join(tmp, "release-watcher.service"),
+			filepath.Join(tmp, "release-watcher.timer"),
+		)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("systemd-analyze verify: %v\n%s", err, output)
+		}
+		if strings.Contains(string(output), "ignoring:") {
+			t.Fatalf("systemd-analyze warnings:\n%s", output)
+		}
+	}
+}

@@ -1,0 +1,51 @@
+[Unit]
+Description=Release Watcher due scan
+Documentation=https://github.com/HaidaDaniel/release-watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=release-watcher
+Group=release-watcher
+WorkingDirectory=/var/lib/release-watcher
+Environment="RELEASE_WATCHER_STATE_DIR=/var/lib/release-watcher"
+EnvironmentFile=-/etc/release-watcher/environment
+ExecStart=/opt/release-watcher/current/release-watcher scan --due --json
+UMask=0077
+StateDirectory=release-watcher
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/release-watcher /var/backups/release-watcher
+
+# Resource isolation. These are starting limits from the NAS audit; adjust only
+# after measuring the real oneshot run. Keep existing services' cgroups untouched.
+MemoryAccounting=yes
+MemoryHigh=256M
+MemoryMax=512M
+MemorySwapMax=128M
+CPUAccounting=yes
+CPUQuota=40%
+CPUWeight=50
+TasksAccounting=yes
+TasksMax=64
+IOAccounting=yes
+IOWeight=50
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=15min
+LimitNOFILE=4096
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

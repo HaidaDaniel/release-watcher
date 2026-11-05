@@ -55,6 +55,46 @@ loginctl show-user "$USER" -p Linger
 
 The installer does not enable lingering automatically; it prints the command when lingering is off. With lingering enabled, the daily timer and `Persistent=true` recover missed runs after reboot. Test this in an isolated user environment before relying on it. Use `systemctl --user list-timers release-watcher.timer` and `journalctl --user -u release-watcher.service` to diagnose scheduling.
 
+## System-level NAS layout (prepared, not installed)
+
+The system-level layout is separate from the user-level templates:
+
+```text
+/opt/release-watcher/releases/<commit>/release-watcher
+/opt/release-watcher/current -> releases/<commit>
+/var/lib/release-watcher/release-watcher.db
+/var/backups/release-watcher/
+/etc/release-watcher/environment
+/etc/systemd/system/release-watcher.service
+/etc/systemd/system/release-watcher.timer
+```
+
+The unit runs as a dedicated `release-watcher` user, with `MemoryHigh=256M`, `MemoryMax=512M`, `MemorySwapMax=128M`, `CPUQuota=40%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`, `IOSchedulingClass=idle`, `TimeoutStartSec=15min`, `LimitNOFILE=4096` and the hardening options in `deploy/systemd/system/release-watcher.service`. Adjust limits only after measuring the real oneshot run.
+
+Build the artifact on the development machine from a clean commit:
+
+```sh
+scripts/package-release.sh --version 0.1.0 --arch amd64
+```
+
+This runs `verify-fast`, `verify-push` and `go test -race`, builds with `CGO_ENABLED=0`/`-trimpath`, and writes `manifest.json` with commit, version, GOOS/GOARCH, build time, SHA-256, size and checks. The NAS receives only the binary and manifest; it never compiles.
+
+On the NAS, as root, install without enabling the timer:
+
+```sh
+sudo scripts/install-system.sh --artifact release-watcher-linux-amd64 \
+  --manifest manifest.json --units-dir deploy/systemd/system
+sudo systemctl start release-watcher.service   # smoke
+# after smoke:
+sudo systemctl enable --now release-watcher.timer
+```
+
+`install-system.sh` validates the manifest/checksum/architecture, creates only Release Watcher paths and user, installs the units, runs `systemd-analyze verify`, switches `current` atomically and keeps the newest releases. It does not start or enable the timer. `rollback-system.sh --commit <sha>` switches back to an installed release and verifies its build identity; if the database schema changed, restore a compatible pre-upgrade backup first.
+
+### Whoosh Core assessment for prebuilt artifacts
+
+Whoosh Core is Git-oriented: it maintains a bare mirror and builds a release from Git on the target, and its target requirements include `git` and `tar`. Its docs do not provide a first-class prebuilt-artifact upload that replaces the build phase. That conflicts with the requirement that the NAS receives a dev-built binary and does not clone/build. The bounded fallback is the SSH/SCP release layout above (or an equivalent minimal script), not a custom deployment framework. Whoosh remains an external evaluation, not a runtime dependency.
+
 ## Configuration
 
 Environment variables are read at process start. Put secrets only in a protected environment file, for example `~/.config/release-watcher/env` (`0600`), and reference it from a drop-in or the service unit.
