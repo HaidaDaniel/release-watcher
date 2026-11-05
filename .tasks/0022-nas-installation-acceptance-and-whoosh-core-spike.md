@@ -1,6 +1,6 @@
 # Task 0022 - NAS installation acceptance and Whoosh Core spike
 
-State: doing
+State: done
 Owner: opencode-primary
 Mode: mvp
 Lane: deployment
