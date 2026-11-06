@@ -35,6 +35,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Narō `end` mapping corrected to the official specification; unwatch preserves history and `purge` is explicit; daily persistent timer and doctor cadence check; non-leaking secret scanner and mandatory APK lint.
 - Calendar-aware day scheduling prevents daily timer jitter/DST from skipping a day while preserving 6h/12h/24h/48h intervals.
 - Streamable HTTP MCP server over `app.Service` with read-only and mutation tools, Bearer token auth and server-side write-mode gating is implemented.
+- Separate MCP systemd unit with cgroup limits, a root-owned `mcp.env` token file and install/rotation helper is implemented and statically verified; it is not installed yet.
 - `remove` cancels that watch's pending/failed deliveries atomically; canceled deliveries never send after restart or re-add, while pause does not cancel.
 - Live Narō smoke and isolated E2E regression are implemented and pass.
 - Media Core documentation is complete in its separate repository (docs only).
@@ -54,7 +55,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Installation tests: backup/restore round-trip, force/exclusivity, bad/missing manifest hash or size, newer/empty schema, sidecar cleanup, symlink/hardlink backup-target rejection, database/archive permissions, doctor schema/newer-schema/read-only sidecar behavior, systemd verification, install rendering with XDG/special paths: see task 0007 evidence.
 - Linux amd64/arm64 builds and local binary smoke checks are recorded in docs/deployment.md.
 - MVP acceptance matrix: `go test ./...`, `go test -race ./...`, `go vet ./...`, `go build ./...`, `scripts/verify-push.sh`, `pnpm exec apkit lint`, linux/amd64 and linux/arm64 builds, release build identity, backup/restore with real data, doctor schema check, systemd unit validation, live Narō smoke, isolated E2E and JSON stdout purity.
-- MCP wire-level tests cover initialize, tools/list, read tools, mutations, duplicate add, pagination, read-only rejection, auth/origin/host rejection and cancellation: see task 0024 evidence.
+- MCP wire-level tests cover initialize, tools/list, read tools, mutations, duplicate add, pagination, read-only rejection, auth/origin/host rejection, oversized body, invalid schemas, unknown/forbidden tools, SSRF, lock propagation, restart persistence and cancellation: see tasks 0024/0025 evidence.
 - Notification cancellation tests cover pending, failed, sent, remove, re-add, restart, pause and shared watches: see task 0018 evidence.
 - Scheduling regression tests cover day1 04:29 -> day2 04:18, evening add, missed days, 6h/12h/24h/48h, manual scan --all, same-window replay and Europe/Berlin DST transitions: see task 0017 evidence.
 - NAS deployment acceptance: system-level install, effective cgroup limits (`cpu.max=40000 100000`, memory/swap/pids/io), SQLite persistence, service run, daily timer, backup/restore on a separate copy, upgrade from `1d89864` to `4d08eff` on a restored test DB and rollback on a separate test root: see task 0022 evidence.

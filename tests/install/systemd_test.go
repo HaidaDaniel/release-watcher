@@ -172,6 +172,10 @@ func TestSystemLevelUnitsAndPackagingScripts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mcp, err := os.ReadFile(filepath.Join(root, "deploy", "systemd", "system", "release-watcher-mcp.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	serviceText := string(service)
 	for _, want := range []string{
 		"User=release-watcher",
@@ -214,7 +218,25 @@ func TestSystemLevelUnitsAndPackagingScripts(t *testing.T) {
 			t.Fatalf("system timer missing %q", want)
 		}
 	}
-	for _, script := range []string{"scripts/package-release.sh", "scripts/install-system.sh", "scripts/rollback-system.sh"} {
+	mcpText := string(mcp)
+	for _, want := range []string{
+		"User=release-watcher",
+		"ExecStart=/opt/release-watcher/current/release-watcher mcp serve",
+		"EnvironmentFile=-/etc/release-watcher/mcp.env",
+		"MemoryHigh=128M",
+		"MemoryMax=256M",
+		"MemorySwapMax=128M",
+		"CPUQuota=25%",
+		"TasksMax=64",
+		"IOWeight=50",
+		"Restart=on-failure",
+		"ReadWritePaths=/var/lib/release-watcher",
+	} {
+		if !strings.Contains(mcpText, want) {
+			t.Fatalf("MCP service missing %q", want)
+		}
+	}
+	for _, script := range []string{"scripts/package-release.sh", "scripts/install-system.sh", "scripts/rollback-system.sh", "scripts/install-mcp-env.sh"} {
 		cmd := exec.Command("bash", "-n", filepath.Join(root, script))
 		if output, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("%s syntax: %v\n%s", script, err, output)
@@ -233,12 +255,19 @@ func TestSystemLevelUnitsAndPackagingScripts(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(tmp, "release-watcher.service"), []byte(serviceCopy), 0o644); err != nil {
 			t.Fatal(err)
 		}
+		mcpCopy := strings.ReplaceAll(mcpText, "/opt/release-watcher/current/release-watcher", fakeBin)
+		mcpCopy = strings.ReplaceAll(mcpCopy, "User=release-watcher", "User=root")
+		mcpCopy = strings.ReplaceAll(mcpCopy, "Group=release-watcher", "Group=root")
+		if err := os.WriteFile(filepath.Join(tmp, "release-watcher-mcp.service"), []byte(mcpCopy), 0o644); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(tmp, "release-watcher.timer"), timer, 0o644); err != nil {
 			t.Fatal(err)
 		}
 		cmd := exec.Command("systemd-analyze", "verify",
 			filepath.Join(tmp, "release-watcher.service"),
 			filepath.Join(tmp, "release-watcher.timer"),
+			filepath.Join(tmp, "release-watcher-mcp.service"),
 		)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -321,7 +350,7 @@ func TestSystemInstallerVerifiesBeforeSwitchAndHasRollback(t *testing.T) {
 	}
 	text := string(script)
 	versionIdx := strings.Index(text, `"$staging/release-watcher" version --json`)
-	verifyIdx := strings.Index(text, `systemd-analyze verify "$verify_units/release-watcher.service"`)
+	verifyIdx := strings.Index(text, `systemd-analyze verify "$verify_units/release-watcher.service" "$verify_units/release-watcher.timer" "$verify_units/release-watcher-mcp.service"`)
 	switchIdx := strings.LastIndex(text, `mv -Tf "$tmp_link" "$root/current"`)
 	if versionIdx < 0 || verifyIdx < 0 || switchIdx < 0 {
 		t.Fatalf("installer is missing a verification or switch step")

@@ -40,7 +40,7 @@ done
 if [[ -z $units_dir ]]; then
   units_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../deploy/systemd/system" && pwd)
 fi
-[[ -f $units_dir/release-watcher.service && -f $units_dir/release-watcher.timer ]] || {
+[[ -f $units_dir/release-watcher.service && -f $units_dir/release-watcher.timer && -f $units_dir/release-watcher-mcp.service ]] || {
   echo 'install-system: systemd units are missing' >&2
   exit 1
 }
@@ -110,6 +110,7 @@ backup_dir=$(mktemp -d)
 previous_current=""
 previous_service=0
 previous_timer=0
+previous_mcp=0
 units_changed=0
 current_changed=0
 release_dir="$root/releases/$commit"
@@ -128,6 +129,11 @@ cleanup() {
         cp -a "$backup_dir/release-watcher.timer" /etc/systemd/system/release-watcher.timer
       else
         rm -f /etc/systemd/system/release-watcher.timer
+      fi
+      if [[ $previous_mcp -eq 1 ]]; then
+        cp -a "$backup_dir/release-watcher-mcp.service" /etc/systemd/system/release-watcher-mcp.service
+      else
+        rm -f /etc/systemd/system/release-watcher-mcp.service
       fi
       systemctl daemon-reload >/dev/null 2>&1 || true
     fi
@@ -157,7 +163,9 @@ install -d -m 0755 "$verify_units"
 sed "s|ExecStart=/opt/release-watcher/current/release-watcher|ExecStart=$staging/release-watcher|" \
   "$units_dir/release-watcher.service" > "$verify_units/release-watcher.service"
 cp "$units_dir/release-watcher.timer" "$verify_units/release-watcher.timer"
-systemd-analyze verify "$verify_units/release-watcher.service" "$verify_units/release-watcher.timer"
+sed "s|ExecStart=/opt/release-watcher/current/release-watcher|ExecStart=$staging/release-watcher|" \
+  "$units_dir/release-watcher-mcp.service" > "$verify_units/release-watcher-mcp.service"
+systemd-analyze verify "$verify_units/release-watcher.service" "$verify_units/release-watcher.timer" "$verify_units/release-watcher-mcp.service"
 
 install -d -m 0755 -o root -g root "$release_dir"
 install -m 0755 -o root -g root "$staging/release-watcher" "$release_dir/release-watcher"
@@ -174,6 +182,10 @@ if [[ -f /etc/systemd/system/release-watcher.timer ]]; then
   cp -a /etc/systemd/system/release-watcher.timer "$backup_dir/release-watcher.timer"
   previous_timer=1
 fi
+if [[ -f /etc/systemd/system/release-watcher-mcp.service ]]; then
+  cp -a /etc/systemd/system/release-watcher-mcp.service "$backup_dir/release-watcher-mcp.service"
+  previous_mcp=1
+fi
 
 tmp_link="$root/.current.$$"
 ln -sfn "$release_dir" "$tmp_link"
@@ -183,8 +195,9 @@ current_changed=1
 units_changed=1
 install -m 0644 -o root -g root "$units_dir/release-watcher.service" /etc/systemd/system/release-watcher.service
 install -m 0644 -o root -g root "$units_dir/release-watcher.timer" /etc/systemd/system/release-watcher.timer
+install -m 0644 -o root -g root "$units_dir/release-watcher-mcp.service" /etc/systemd/system/release-watcher-mcp.service
 systemctl daemon-reload
-systemd-analyze verify /etc/systemd/system/release-watcher.service /etc/systemd/system/release-watcher.timer
+systemd-analyze verify /etc/systemd/system/release-watcher.service /etc/systemd/system/release-watcher.timer /etc/systemd/system/release-watcher-mcp.service
 
 # Keep the newest releases, but never remove the current target. Pruning is
 # best-effort: a pruning failure must not roll back a successful install.
@@ -208,6 +221,7 @@ fi
 
 echo "install-system: installed $commit ($version) at $release_dir"
 echo "install-system: current -> $root/current"
-echo "install-system: timer is NOT enabled"
+echo "install-system: timer and MCP service are NOT enabled"
 echo "Next: systemctl start release-watcher.service   # smoke"
 echo "Then: systemctl enable --now release-watcher.timer"
+echo "MCP:  sudo scripts/install-mcp-env.sh [--write-enabled], then start release-watcher-mcp.service"

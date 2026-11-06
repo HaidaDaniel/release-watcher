@@ -110,6 +110,47 @@ Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git
 - Telegram: `NOT_CONFIGURED`; no messages were sent.
 - The smoke watch was created with a short interval to force a due scan, then changed to the default 24h. `doctor` reports `system timer cadence 24h0m0s covers the shortest enabled watch interval 24h0m0s`.
 
+## MCP service (prepared, not installed by default)
+
+The MCP server is a separate system-level oneshot-independent service:
+
+```text
+/opt/release-watcher/current/release-watcher mcp serve
+/etc/systemd/system/release-watcher-mcp.service
+/etc/release-watcher/mcp.env
+```
+
+- Unit: `deploy/systemd/system/release-watcher-mcp.service`.
+- Runtime user: `release-watcher`, no root.
+- Bind: `127.0.0.1:8741` by default. Do not expose this port publicly.
+- Resource limits: `MemoryHigh=128M`, `MemoryMax=256M`, `MemorySwapMax=128M`,
+  `CPUQuota=25%`, `CPUWeight=50`, `TasksMax=64`, `IOWeight=50`, `Nice=10`,
+  `IOSchedulingClass=idle`, `LimitNOFILE=4096`.
+- Hardening: `NoNewPrivileges=yes`, `PrivateTmp=yes`, `ProtectSystem=strict`,
+  `ProtectHome=yes`, `ProtectKernelTunables=yes`, `ProtectKernelModules=yes`,
+  `ProtectControlGroups=yes`, `RestrictSUIDSGID=yes`, `RestrictRealtime=yes`.
+- Restart: `on-failure`, 5 s delay, 5-start burst limit.
+- The service uses the existing SQLite state; it never opens a second database.
+
+Create the token file as root. The script generates `openssl rand -hex 32`
+(256 bits) and never prints it:
+
+```sh
+sudo scripts/install-mcp-env.sh             # read-only MCP
+sudo scripts/install-mcp-env.sh --write-enabled
+sudo scripts/install-mcp-env.sh --force     # rotate token
+```
+
+`mcp.env` is root-owned `0600`. The token is read by the systemd manager, not
+passed in command-line arguments and not stored in a release directory. Copy
+the token into Hermes' protected secret store; do not put it in Git.
+
+The application does not terminate TLS. Remote Hermes access requires an
+existing private HTTPS/VPN route. If a reverse proxy connects with a
+non-loopback Host, add that host to `RELEASE_WATCHER_MCP_ALLOWED_HOSTS`; allow
+browser origins only when a browser client is intentionally used. Do not use
+`ssl_verify: false`.
+
 ## Configuration
 
 Environment variables are read at process start. Put secrets only in a protected environment file, for example `~/.config/release-watcher/env` (`0600`), and reference it from a drop-in or the service unit.

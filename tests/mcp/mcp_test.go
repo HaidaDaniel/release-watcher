@@ -61,14 +61,15 @@ type mcpEnv struct {
 	server *httptest.Server
 	svc    *app.Service
 	feed   *feedFixture
+	cfg    config.Config
 }
 
 func newEnv(t *testing.T, write bool) *mcpEnv {
 	t.Helper()
-	return newEnvWith(t, write, nil)
+	return newEnvWith(t, write, nil, true)
 }
 
-func newEnvWith(t *testing.T, write bool, allowedHosts []string) *mcpEnv {
+func newEnvWith(t *testing.T, write bool, allowedHosts []string, allowPrivate bool) *mcpEnv {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := config.Config{
@@ -87,7 +88,7 @@ func newEnvWith(t *testing.T, write bool, allowedHosts []string) *mcpEnv {
 		RateInterval:      0,
 		MaxRetries:        0,
 		MaxBodyBytes:      1 << 20,
-		AllowPrivateHosts: true,
+		AllowPrivateHosts: allowPrivate,
 	}
 	feed := newFeedFixture(t, "A")
 	client := httpx.New(httpx.Config{
@@ -108,14 +109,14 @@ func newEnvWith(t *testing.T, write bool, allowedHosts []string) *mcpEnv {
 		WriteEnabled:  write,
 		AllowedHosts:  allowedHosts,
 		MaxBodyBytes:  64 << 10,
-		MaxConcurrent: 4,
+		MaxConcurrent: 8,
 	}, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ts := httptest.NewServer(server.Handler())
 	t.Cleanup(ts.Close)
-	return &mcpEnv{server: ts, svc: svc, feed: feed}
+	return &mcpEnv{server: ts, svc: svc, feed: feed, cfg: cfg}
 }
 
 type authTransport struct{ token string }
@@ -355,7 +356,7 @@ func TestMCPPaginationAndCancellation(t *testing.T) {
 }
 
 func TestMCPAllowedHostNormalization(t *testing.T) {
-	env := newEnvWith(t, true, []string{"private.example.com:443"})
+	env := newEnvWith(t, true, []string{"private.example.com:443"}, true)
 	req, err := http.NewRequest(http.MethodPost, env.server.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}`))
 	if err != nil {
 		t.Fatal(err)

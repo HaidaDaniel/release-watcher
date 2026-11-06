@@ -197,3 +197,11 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Context: Hermes needs to manage watches and read events without SSH or direct SQLite access. The official MCP Go SDK v1.8.0 supports MCP 2026-07-28 and older revisions; Hermes' current Python client implements 2026-07-28.
 - Decision: Add `release-watcher mcp serve` with a single `/mcp` Streamable HTTP endpoint, stateless sessions, the official SDK, and typed tools over `app.Service`. Expose only `list_watches`, `get_watch`, `list_events`, `add_watch`, `pause_watch`, `resume_watch`, `set_watch_interval` and `remove_watch`. Never expose purge, backup, restore, shell, filesystem, systemd or raw SQL. Use a single static Bearer token and a server-side write-mode switch; read-only mode does not register mutation tools.
 - Consequences: MCP and the CLI share one application layer and one SQLite database. The endpoint is loopback-first and requires an authenticated private HTTPS/VPN route for remote Hermes access. Token rotation is a config replacement plus service restart; no OAuth or accounts are added.
+
+## ADR-0027 — MCP Bearer token, write-mode gate and separate service
+
+- Date: 2026-11-05
+- Status: Accepted and implemented by task 0025
+- Context: Hermes runs on another machine and needs authenticated remote access without OAuth or a second database. The MCP server must not expose mutation tools by default or leak the token through logs/errors.
+- Decision: Require one static 256-bit Bearer token in `Authorization`, compare SHA-256 digests in constant time, and never accept the token in a URL or print it. `RELEASE_WATCHER_MCP_WRITE_ENABLED=false` by default: mutation tools are not registered and cannot be executed. Enforce Host/Origin allowlists, body/timeout/concurrency limits, stateless MCP sessions, mutation throttling and graceful shutdown. Ship a separate `release-watcher-mcp.service` with `release-watcher` user, loopback bind, cgroup limits and `EnvironmentFile=-/etc/release-watcher/mcp.env` (root-owned 0600). The scanner units are unchanged.
+- Consequences: Token rotation is file replacement plus service restart. Remote access still requires an existing private HTTPS/VPN route; the app does not terminate TLS. Write mode is an explicit server-side authorization boundary, not an LLM annotation.
