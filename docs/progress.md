@@ -59,6 +59,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - Notification cancellation tests cover pending, failed, sent, remove, re-add, restart, pause and shared watches: see task 0018 evidence.
 - Scheduling regression tests cover day1 04:29 -> day2 04:18, evening add, missed days, 6h/12h/24h/48h, manual scan --all, same-window replay and Europe/Berlin DST transitions: see task 0017 evidence.
 - NAS deployment acceptance: system-level install, effective cgroup limits (`cpu.max=40000 100000`, memory/swap/pids/io), SQLite persistence, service run, daily timer, backup/restore on a separate copy, upgrade from `1d89864` to `4d08eff` on a restored test DB and rollback on a separate test root: see task 0022 evidence.
+- MCP deployment: `0.2.0`/`c7f996b` installed, loopback-only service active, effective cgroup limits and auth/tools verified; rollback `c7f996b`->`4d08eff` verified on a separate root. See task 0026 evidence and `deploy/hermes/README.md`.
 - Signal/timeout/lock acceptance: a second concurrent scan exits 4 with a JSON `locked` error; SIGINT ends the scan with a partial-failure JSON envelope and exit 3; an external timeout terminates the process; a later run succeeds.
 
 ## Deployed

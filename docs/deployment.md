@@ -169,6 +169,7 @@ browser origins only when a browser client is intentionally used. Do not use
   worked. The watch was resumed and remains enabled.
 - The daily timer stayed active. A manual `scan --due` ran while MCP was active,
   reported `unchanged`/0 events and did not disturb the MCP process.
+- MCP rollout rollback was verified on a separate root: `c7f996b` -> `4d08eff`, embedded commit checked. The previous release remains installed; the production scanner and database were not switched during the test.
 - ResLedger, its scheduler and the Telegram agent remained active.
 - Remote Hermes acceptance is **blocked**: the NAS has no private HTTPS/VPN
   endpoint and the MCP service intentionally does not terminate TLS. The
