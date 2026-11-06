@@ -60,6 +60,7 @@ Stable error codes:
 | `fetch_failed` | source request/parse failed |
 | `source_timeout` | source exceeded its timeout |
 | `rate_limited` | source returned 429 or pacing denied the request |
+| `mcp_rate_limited` | the MCP mutation rate limit was exceeded |
 | `source_not_found` | source returned 404 |
 | `source_forbidden` | source returned 401/403 |
 | `ssrf_blocked` | target resolves to a disallowed address |

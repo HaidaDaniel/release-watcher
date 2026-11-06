@@ -65,6 +65,11 @@ type mcpEnv struct {
 
 func newEnv(t *testing.T, write bool) *mcpEnv {
 	t.Helper()
+	return newEnvWith(t, write, nil)
+}
+
+func newEnvWith(t *testing.T, write bool, allowedHosts []string) *mcpEnv {
+	t.Helper()
 	dir := t.TempDir()
 	cfg := config.Config{
 		StateDir:          dir,
@@ -101,7 +106,7 @@ func newEnv(t *testing.T, write bool) *mcpEnv {
 	server, err := rwmcp.New(svc, rwmcp.Config{
 		Token:         testToken,
 		WriteEnabled:  write,
-		AllowedHosts:  nil,
+		AllowedHosts:  allowedHosts,
 		MaxBodyBytes:  64 << 10,
 		MaxConcurrent: 4,
 	}, logger)
@@ -173,7 +178,7 @@ func toolNames(t *testing.T, session *sdkmcp.ClientSession) map[string]bool {
 
 func TestMCPReadToolsAndMutations(t *testing.T) {
 	env := newEnv(t, true)
-	session := connect(t, env.server.URL, testToken)
+	session := connect(t, env.server.URL+"/mcp", testToken)
 	if version := session.InitializeResult().ProtocolVersion; version == "" {
 		t.Fatal("empty negotiated protocol version")
 	}
@@ -269,7 +274,7 @@ func TestMCPReadToolsAndMutations(t *testing.T) {
 
 func TestMCPReadOnlyMode(t *testing.T) {
 	env := newEnv(t, false)
-	session := connect(t, env.server.URL, testToken)
+	session := connect(t, env.server.URL+"/mcp", testToken)
 	names := toolNames(t, session)
 	for _, name := range []string{"add_watch", "pause_watch", "resume_watch", "set_watch_interval", "remove_watch"} {
 		if names[name] {
@@ -321,7 +326,7 @@ func TestMCPAuthenticationAndHostOrigin(t *testing.T) {
 
 func TestMCPPaginationAndCancellation(t *testing.T) {
 	env := newEnv(t, true)
-	session := connect(t, env.server.URL, testToken)
+	session := connect(t, env.server.URL+"/mcp", testToken)
 	var added app.AddResult
 	decode(t, call(t, session, "add_watch", map[string]any{"url": env.feed.server.URL + "/feed.xml", "interval": "24h"}), &added)
 	env.feed.set("A", "B")
@@ -346,5 +351,103 @@ func TestMCPPaginationAndCancellation(t *testing.T) {
 	cancel()
 	if _, err := session.CallTool(ctx, &sdkmcp.CallToolParams{Name: "list_watches", Arguments: map[string]any{}}); err == nil {
 		t.Fatal("canceled call succeeded")
+	}
+}
+
+func TestMCPAllowedHostNormalization(t *testing.T) {
+	env := newEnvWith(t, true, []string{"private.example.com:443"})
+	req, err := http.NewRequest(http.MethodPost, env.server.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testToken)
+	req.Host = "private.example.com"
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusForbidden {
+		t.Fatalf("configured allowed host was rejected")
+	}
+}
+
+func TestMCPOversizedBodyAndValidation(t *testing.T) {
+	env := newEnv(t, true)
+	post := func(body string) int {
+		req, err := http.NewRequest(http.MethodPost, env.server.URL+"/mcp", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+testToken)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+	if got := post(strings.Repeat("x", 70<<10)); got != http.StatusRequestEntityTooLarge && got != http.StatusBadRequest {
+		t.Fatalf("oversized body status = %d", got)
+	}
+	session := connect(t, env.server.URL+"/mcp", testToken)
+	result, err := session.CallTool(context.Background(), &sdkmcp.CallToolParams{Name: "list_events", Arguments: map[string]any{"limit": 1000}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.IsError {
+		t.Fatal("invalid limit was accepted")
+	}
+	result, err = session.CallTool(context.Background(), &sdkmcp.CallToolParams{Name: "add_watch", Arguments: map[string]any{"url": env.feed.server.URL + "/feed.xml", "interval": "not-a-duration"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.IsError {
+		t.Fatal("invalid interval was accepted")
+	}
+}
+
+func TestMCPPropagatesRequestCancellation(t *testing.T) {
+	env := newEnv(t, true)
+	started := make(chan struct{})
+	canceled := make(chan struct{})
+	var once sync.Once
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() { close(started) })
+		select {
+		case <-r.Context().Done():
+			close(canceled)
+		case <-time.After(5 * time.Second):
+		}
+	}))
+	defer slow.Close()
+	session := connect(t, env.server.URL+"/mcp", testToken)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := session.CallTool(ctx, &sdkmcp.CallToolParams{Name: "add_watch", Arguments: map[string]any{"url": slow.URL + "/feed.xml"}})
+		errCh <- err
+	}()
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("source request did not start")
+	}
+	cancel()
+	select {
+	case <-canceled:
+	case <-time.After(3 * time.Second):
+		t.Fatal("server-side source request was not canceled in flight")
+	}
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("canceled tool call returned success")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("canceled tool call did not return")
 	}
 }

@@ -49,6 +49,9 @@ Mutations (only when `RELEASE_WATCHER_MCP_WRITE_ENABLED=true`):
 - `remove_watch` — stops watching, preserves history and cancels pending
   notifications. Never calls `purge`.
 
+MCP mutation throttling returns the stable code `mcp_rate_limited`; it is
+separate from the source `rate_limited` error.
+
 Not exposed: `purge`, `backup`, `restore`, raw SQL, shell, filesystem, systemd,
 token changes, arbitrary scans and arbitrary Telegram messages.
 

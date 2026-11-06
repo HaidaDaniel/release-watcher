@@ -85,11 +85,16 @@ func New(svc *app.Service, cfg Config, logger *slog.Logger) (*Server, error) {
 	}
 	s.registerTools()
 	handler := sdkmcp.NewStreamableHTTPHandler(func(*http.Request) *sdkmcp.Server { return sdk }, &sdkmcp.StreamableHTTPOptions{
-		Stateless:           true,
-		MaxRequestBodyBytes: cfg.MaxBodyBytes,
-		Logger:              logger,
+		Stateless:                    true,
+		MaxRequestBodyBytes:          cfg.MaxBodyBytes,
+		Logger:                       logger,
+		DisableLocalhostProtection:   true,
+		PropagateRequestCancellation: true,
 	})
-	s.handler = s.middleware(handler)
+	base := s.middleware(handler)
+	mux := http.NewServeMux()
+	mux.Handle("/mcp", base)
+	s.handler = mux
 	return s, nil
 }
 
@@ -135,20 +140,24 @@ func (s *Server) hostMiddleware(next http.Handler) http.Handler {
 		"127.0.0.1": true, "localhost": true, "::1": true, "[::1]": true,
 	}
 	for _, host := range s.cfg.AllowedHosts {
-		allowed[strings.ToLower(strings.TrimSpace(host))] = true
+		allowed[normalizeHost(host)] = true
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		host := r.Host
-		if parsed, _, err := net.SplitHostPort(r.Host); err == nil {
-			host = parsed
-		}
-		host = strings.Trim(strings.ToLower(host), "[]")
+		host := normalizeHost(r.Host)
 		if !allowed[host] {
 			http.Error(w, "forbidden host", http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func normalizeHost(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if host, _, err := net.SplitHostPort(value); err == nil {
+		value = host
+	}
+	return strings.Trim(value, "[]")
 }
 
 func (s *Server) originMiddleware(next http.Handler) http.Handler {

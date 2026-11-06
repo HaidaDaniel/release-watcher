@@ -162,7 +162,7 @@ func (s *Server) listEvents(ctx context.Context, _ *sdkmcp.CallToolRequest, in l
 
 func (s *Server) addWatch(ctx context.Context, _ *sdkmcp.CallToolRequest, in addWatchInput) (*sdkmcp.CallToolResult, any, error) {
 	if !s.allowMutation() {
-		return toolErrorCode("rate_limited", "too many mutation requests"), nil, nil
+		return toolErrorCode("mcp_rate_limited", "too many mutation requests"), nil, nil
 	}
 	var interval *time.Duration
 	if in.Interval != "" {
@@ -181,7 +181,7 @@ func (s *Server) addWatch(ctx context.Context, _ *sdkmcp.CallToolRequest, in add
 
 func (s *Server) pauseWatch(ctx context.Context, _ *sdkmcp.CallToolRequest, in watchIDInput) (*sdkmcp.CallToolResult, any, error) {
 	if !s.allowMutation() {
-		return toolErrorCode("rate_limited", "too many mutation requests"), nil, nil
+		return toolErrorCode("mcp_rate_limited", "too many mutation requests"), nil, nil
 	}
 	result, appErr := s.svc.Pause(ctx, in.WatchID)
 	if appErr != nil {
@@ -192,7 +192,7 @@ func (s *Server) pauseWatch(ctx context.Context, _ *sdkmcp.CallToolRequest, in w
 
 func (s *Server) resumeWatch(ctx context.Context, _ *sdkmcp.CallToolRequest, in watchIDInput) (*sdkmcp.CallToolResult, any, error) {
 	if !s.allowMutation() {
-		return toolErrorCode("rate_limited", "too many mutation requests"), nil, nil
+		return toolErrorCode("mcp_rate_limited", "too many mutation requests"), nil, nil
 	}
 	result, appErr := s.svc.Resume(ctx, in.WatchID)
 	if appErr != nil {
@@ -203,7 +203,7 @@ func (s *Server) resumeWatch(ctx context.Context, _ *sdkmcp.CallToolRequest, in 
 
 func (s *Server) setWatchInterval(ctx context.Context, _ *sdkmcp.CallToolRequest, in intervalInput) (*sdkmcp.CallToolResult, any, error) {
 	if !s.allowMutation() {
-		return toolErrorCode("rate_limited", "too many mutation requests"), nil, nil
+		return toolErrorCode("mcp_rate_limited", "too many mutation requests"), nil, nil
 	}
 	duration, err := time.ParseDuration(in.Interval)
 	if err != nil {
@@ -218,7 +218,7 @@ func (s *Server) setWatchInterval(ctx context.Context, _ *sdkmcp.CallToolRequest
 
 func (s *Server) removeWatch(ctx context.Context, _ *sdkmcp.CallToolRequest, in watchIDInput) (*sdkmcp.CallToolResult, any, error) {
 	if !s.allowMutation() {
-		return toolErrorCode("rate_limited", "too many mutation requests"), nil, nil
+		return toolErrorCode("mcp_rate_limited", "too many mutation requests"), nil, nil
 	}
 	result, appErr := s.svc.Remove(ctx, in.WatchID)
 	if appErr != nil {
