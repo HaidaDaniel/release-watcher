@@ -1,7 +1,7 @@
 # Task 0024 - MCP Streamable HTTP protocol and application adapter
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Type: feature
