@@ -4,8 +4,10 @@ The NAS MCP service is deployed as:
 
 - binary `0.2.0`, commit `c7f996b30d9e055ad71511307bbdd77184c667c9`
 - service `release-watcher-mcp.service`
-- bind `127.0.0.1:8741` (not public)
-- endpoint `/mcp`
+- app bind `127.0.0.1:8741` (not public)
+- LAN HTTPS reverse proxy `https://<NAS_LAN_IP>:8742/mcp`, bound to the LAN
+  interface only and restricted to the LAN CIDR
+- self-signed CA `/etc/release-watcher/tls/mcp-ca.crt` on the NAS
 - write mode enabled on the server
 - token file `/etc/release-watcher/mcp.env` (root:root, `0600`)
 
@@ -21,29 +23,32 @@ Copy the `RELEASE_WATCHER_MCP_TOKEN` value into Hermes' protected
 `~/.hermes/.env`. Do not paste the token into `config.yaml`, shell history,
 Git, logs or messages.
 
-## 2. Provide a secure route
+## 2. Trust the LAN CA on the Hermes PC
 
-The MCP process is loopback-only. Hermes must not connect over plain HTTP from
-another machine.
-
-Preferred: use an existing private VPN or an existing HTTPS reverse proxy.
-The proxy must preserve the public Host and forward to
-`http://127.0.0.1:8741/mcp`. Add the public hostname to the NAS config and
-restart the service:
+Copy the public CA certificate (not the private key) from the NAS:
 
 ```sh
-# edit /etc/release-watcher/mcp.env
-RELEASE_WATCHER_MCP_ALLOWED_HOSTS=mcp.private.example
-sudo systemctl restart release-watcher-mcp.service
+scp <nas-user>@<NAS_LAN_IP>:/etc/release-watcher/tls/mcp-ca.crt .
 ```
 
-See `nginx-mcp.conf.example` for a minimal TLS proxy example. Do not use
-`ssl_verify: false` in Hermes.
+On a Debian/Ubuntu Hermes host:
 
-If there is no private HTTPS/VPN route, remote Hermes deployment remains
-blocked. An SSH local-forward (`ssh -L 8741:127.0.0.1:8741 ...`) can be used only
-for a local validation session; it is not the production transport and gives
-Hermes SSH credentials, which this integration intentionally avoids.
+```sh
+sudo cp mcp-ca.crt /usr/local/share/ca-certificates/release-watcher-mcp.crt
+sudo update-ca-certificates
+```
+
+If Hermes uses its own Python trust store, set `SSL_CERT_FILE` to the copied
+`mcp-ca.crt` for the Hermes process. Never use `ssl_verify: false`.
+
+The LAN endpoint is `https://<NAS_LAN_IP>:8742/mcp`. It is bound to the NAS LAN
+interface and restricted to the LAN CIDR; port 8741 itself remains loopback and
+there is no public internet exposure.
+
+If the NAS LAN IP or hostname changes, update the certificate SAN, the nginx
+`server_name`/`listen` and `RELEASE_WATCHER_MCP_ALLOWED_HOSTS`, then restart the
+MCP service and nginx. For access from outside the LAN, use an existing private
+VPN/HTTPS route instead of port-forwarding this port to the internet.
 
 ## 3. Add the MCP server to Hermes
 
@@ -67,9 +72,11 @@ shell, filesystem or systemd tools.
 On the NAS:
 
 ```sh
-sudo scripts/install-mcp-env.sh --force --write-enabled
+sudo scripts/install-mcp-env.sh --force --write-enabled \
+  --allowed-hosts <NAS_LAN_IP>,<NAS_HOSTNAME>,<NAS_HOSTNAME>.local
 ```
 
 Then update `RELEASE_WATCHER_MCP_TOKEN` in Hermes' `.env` and restart both the
 MCP service and Hermes. The old token stops working immediately after the MCP
-restart.
+restart. If the script is not on the NAS, copy it from the deployment checkout
+or run the equivalent `openssl rand -hex 32` command directly on the NAS.

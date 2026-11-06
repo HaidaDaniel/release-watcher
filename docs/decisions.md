@@ -213,3 +213,11 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Context: The new MCP service was deployed to the NAS with a fresh artifact, a root-owned token file and cgroup limits. The NAS audit found no private VPN or TLS reverse proxy; only plain HTTP nginx endpoints exist. The app does not terminate TLS, and the task forbids sending the Bearer token over unencrypted HTTP or using `ssl_verify: false`.
 - Decision: Keep the MCP listener on `127.0.0.1:8741` and mark remote Hermes deployment blocked until the operator provides an existing private HTTPS/VPN route or terminates TLS in a reverse proxy. Provide `deploy/hermes/` with a config template, a TLS nginx example and token-rotation instructions. Do not open a public port, do not install a new VPN/reverse proxy automatically and do not use an SSH tunnel as the production transport.
 - Consequences: Local MCP, auth, cgroups, SQLite and the scanner coexist and are verified. Hermes integration awaits the operator's secure route and client installation; task 0026 remains blocked rather than claiming a remote deployment.
+
+## ADR-0029 — LAN-only TLS reverse proxy for MCP
+
+- Date: 2026-11-06
+- Status: Accepted and implemented by task 0026
+- Context: Hermes runs on a second PC on the same LAN. The MCP app is loopback-only and does not terminate TLS; plain HTTP on the LAN would expose the Bearer token. No VPN or public TLS endpoint exists.
+- Decision: Add a dedicated nginx TLS vhost on the NAS LAN IP port 8742, bound only to the LAN interface and restricted to the LAN CIDR. It proxies only `/mcp` to `127.0.0.1:8741/mcp`, preserves Host, and uses a self-signed CA with SANs for the LAN IP and NAS hostnames. The CA certificate is public and the server key is root-owned. `RELEASE_WATCHER_MCP_ALLOWED_HOSTS` contains the LAN IP/hostnames. Do not port-forward to the internet and do not use `ssl_verify: false`.
+- Consequences: Hermes on the LAN can use HTTPS with normal certificate verification after trusting the CA. The MCP app remains unprivileged and loopback-only; nginx is the TLS boundary. Remote access outside the LAN still requires a VPN/HTTPS route.

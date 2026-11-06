@@ -3,7 +3,7 @@
 # directly in config.yaml and do not commit it.
 mcp_servers:
   release_watcher:
-    url: "https://<PRIVATE_MCP_HOST>/mcp"
+    url: "https://<NAS_LAN_IP>:8742/mcp"
     headers:
       Authorization: "Bearer ${RELEASE_WATCHER_MCP_TOKEN}"
     ssl_verify: true

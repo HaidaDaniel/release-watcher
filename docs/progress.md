@@ -68,7 +68,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Blocked
 
-- Hermes remote MCP acceptance: the NAS MCP service is deployed and locally verified, but there is no private HTTPS/VPN route and the Hermes client is operator-owned. Task 0026 remains blocked pending a secure route and Hermes installation.
+- Hermes remote MCP acceptance: the NAS MCP service is deployed, LAN HTTPS is available at `https://<NAS_LAN_IP>:8742/mcp` with a self-signed CA, and the official Go MCP client negotiated `2026-07-28` over that route. Task 0026 remains blocked only on the operator installing the Hermes client and trusting the CA.
 - Whoosh Core live deployment: no test host; assessment documented but not executed. Task 0008 remains blocked pending a real test host and explicit deployment permission.
 
 ## APK process note
