@@ -77,7 +77,7 @@ func newEnvWith(t *testing.T, write bool, allowedHosts []string) *mcpEnv {
 		LockPath:          filepath.Join(dir, "scan.lock"),
 		DefaultInterval:   24 * time.Hour,
 		Location:          time.UTC,
-		HTTPTimeout:       2 * time.Second,
+		HTTPTimeout:       10 * time.Second,
 		UserAgent:         "release-watcher-mcp-test",
 		Lang:              "ru",
 		LogFormat:         "text",
@@ -179,8 +179,8 @@ func toolNames(t *testing.T, session *sdkmcp.ClientSession) map[string]bool {
 func TestMCPReadToolsAndMutations(t *testing.T) {
 	env := newEnv(t, true)
 	session := connect(t, env.server.URL+"/mcp", testToken)
-	if version := session.InitializeResult().ProtocolVersion; version == "" {
-		t.Fatal("empty negotiated protocol version")
+	if version := session.InitializeResult().ProtocolVersion; version != "2026-07-28" {
+		t.Fatalf("negotiated protocol version = %q, want 2026-07-28", version)
 	}
 	names := toolNames(t, session)
 	for _, name := range []string{"list_watches", "get_watch", "list_events", "add_watch", "pause_watch", "resume_watch", "set_watch_interval", "remove_watch"} {
@@ -289,7 +289,7 @@ func TestMCPReadOnlyMode(t *testing.T) {
 func TestMCPAuthenticationAndHostOrigin(t *testing.T) {
 	env := newEnv(t, true)
 	post := func(token, origin, host string) int {
-		req, err := http.NewRequest(http.MethodPost, env.server.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`))
+		req, err := http.NewRequest(http.MethodPost, env.server.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}`))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -356,11 +356,12 @@ func TestMCPPaginationAndCancellation(t *testing.T) {
 
 func TestMCPAllowedHostNormalization(t *testing.T) {
 	env := newEnvWith(t, true, []string{"private.example.com:443"})
-	req, err := http.NewRequest(http.MethodPost, env.server.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`))
+	req, err := http.NewRequest(http.MethodPost, env.server.URL+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2026-07-28","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set("Authorization", "Bearer "+testToken)
 	req.Host = "private.example.com"
 	resp, err := http.DefaultClient.Do(req)
@@ -368,8 +369,8 @@ func TestMCPAllowedHostNormalization(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusForbidden {
-		t.Fatalf("configured allowed host was rejected")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("configured allowed host status = %d", resp.StatusCode)
 	}
 }
 
@@ -450,4 +451,34 @@ func TestMCPPropagatesRequestCancellation(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("canceled tool call did not return")
 	}
+}
+
+func TestMCPMutationRateLimit(t *testing.T) {
+	env := newEnv(t, true)
+	session := connect(t, env.server.URL+"/mcp", testToken)
+	var added app.AddResult
+	decode(t, call(t, session, "add_watch", map[string]any{"url": env.feed.server.URL + "/feed.xml", "interval": "24h"}), &added)
+	for i := 0; i < 20; i++ {
+		result, err := session.CallTool(context.Background(), &sdkmcp.CallToolParams{Name: "pause_watch", Arguments: map[string]any{"watch_id": added.WatchID}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.IsError {
+			var payload struct {
+				Error struct {
+					Code string `json:"code"`
+				} `json:"error"`
+			}
+			for _, content := range result.Content {
+				if text, ok := content.(*sdkmcp.TextContent); ok {
+					_ = json.Unmarshal([]byte(text.Text), &payload)
+				}
+			}
+			if payload.Error.Code != "mcp_rate_limited" {
+				t.Fatalf("rate-limit code = %q", payload.Error.Code)
+			}
+			return
+		}
+	}
+	t.Fatal("mutation rate limit was not enforced")
 }
