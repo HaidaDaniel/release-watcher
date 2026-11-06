@@ -1,7 +1,7 @@
 # Task 0025 - MCP authentication, HTTP hardening and systemd packaging
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: implementation
 Type: security
