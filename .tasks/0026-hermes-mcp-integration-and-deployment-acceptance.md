@@ -1,7 +1,7 @@
 # Task 0026 - Hermes MCP integration and deployment acceptance
 
-State: todo
-Owner: none
+State: doing
+Owner: opencode-primary
 Mode: mvp
 Lane: deployment
 Type: deployment
