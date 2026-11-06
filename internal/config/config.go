@@ -32,6 +32,11 @@ type Config struct {
 	TelegramChatID    string
 	TelegramAPIBase   string
 	NaroAPIBase       string
+	MCPToken          string
+	MCPListen         string
+	MCPWriteEnabled   bool
+	MCPAllowedHosts   []string
+	MCPAllowedOrigins []string
 	NaroCatalogBase   string
 	AllowPrivateHosts bool
 	MaxDeliveryTries  int
@@ -153,6 +158,18 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 	}
 
+	mcpToken := strings.TrimSpace(getenv("RELEASE_WATCHER_MCP_TOKEN"))
+	mcpListen := strings.TrimSpace(getenv("RELEASE_WATCHER_MCP_LISTEN"))
+	if mcpListen == "" {
+		mcpListen = "127.0.0.1:8741"
+	}
+	mcpWriteEnabled, err := boolEnv(getenv, "RELEASE_WATCHER_MCP_WRITE_ENABLED", false)
+	if err != nil {
+		return Config{}, err
+	}
+	mcpAllowedHosts := splitCSV(getenv("RELEASE_WATCHER_MCP_ALLOWED_HOSTS"))
+	mcpAllowedOrigins := splitCSV(getenv("RELEASE_WATCHER_MCP_ALLOWED_ORIGINS"))
+
 	naroAPIBase := strings.TrimSpace(getenv("RELEASE_WATCHER_NARO_API_BASE"))
 	if naroAPIBase != "" && !strings.HasPrefix(naroAPIBase, "http://") && !strings.HasPrefix(naroAPIBase, "https://") {
 		return Config{}, fmt.Errorf("RELEASE_WATCHER_NARO_API_BASE must be an http(s) URL")
@@ -190,6 +207,11 @@ func Load(getenv func(string) string) (Config, error) {
 		TelegramChatID:    strings.TrimSpace(getenv("RELEASE_WATCHER_TELEGRAM_CHAT_ID")),
 		TelegramAPIBase:   strings.TrimRight(telegramAPIBase, "/"),
 		NaroAPIBase:       naroAPIBase,
+		MCPToken:          mcpToken,
+		MCPListen:         mcpListen,
+		MCPWriteEnabled:   mcpWriteEnabled,
+		MCPAllowedHosts:   mcpAllowedHosts,
+		MCPAllowedOrigins: mcpAllowedOrigins,
 		NaroCatalogBase:   naroCatalogBase,
 		AllowPrivateHosts: allowPrivate,
 		MaxDeliveryTries:  maxTries,
@@ -229,6 +251,17 @@ func durationEnv(getenv func(string) string, key string, def time.Duration) (tim
 		return 0, fmt.Errorf("%s must be a duration such as 24h: %w", key, err)
 	}
 	return d, nil
+}
+
+func splitCSV(raw string) []string {
+	var out []string
+	for _, value := range strings.Split(raw, ",") {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func boolEnv(getenv func(string) string, key string, def bool) (bool, error) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -130,6 +131,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, getenv fu
 		return r.remove(ctx, commandArgs)
 	case "purge":
 		return r.purge(ctx, commandArgs)
+	case "mcp":
+		return r.mcp(ctx, commandArgs)
 	default:
 		return r.fail(&commandError{
 			code:    "usage",
@@ -239,16 +242,21 @@ func flagBool(values map[string]string, name string) bool {
 }
 
 func (r *runner) openService(ctx context.Context) (*app.Service, func(), *commandError) {
+	svc, _, _, closeStore, err := r.openServiceConfig(ctx)
+	return svc, closeStore, err
+}
+
+func (r *runner) openServiceConfig(ctx context.Context) (*app.Service, config.Config, *slog.Logger, func(), *commandError) {
 	cfg, err := config.Load(r.getenv)
 	if err != nil {
-		return nil, nil, &commandError{code: "config_error", message: err.Error(), exit: ExitError}
+		return nil, config.Config{}, nil, nil, &commandError{code: "config_error", message: err.Error(), exit: ExitError}
 	}
 	if r.logJSON {
 		cfg.LogFormat = "json"
 	}
 	st, err := store.Open(ctx, cfg.DBPath)
 	if err != nil {
-		return nil, nil, &commandError{code: "storage_error", message: err.Error(), exit: ExitError}
+		return nil, config.Config{}, nil, nil, &commandError{code: "storage_error", message: err.Error(), exit: ExitError}
 	}
 	logger := logging.New(cfg.LogFormat, cfg.LogLevel, r.stderr)
 	client := httpx.New(httpx.Config{
@@ -272,7 +280,7 @@ func (r *runner) openService(ctx context.Context) (*app.Service, func(), *comman
 	if cfg.TelegramEnabled() {
 		svc.SetNotifier(notifier.NewTelegram(cfg.TelegramAPIBase, cfg.TelegramToken, cfg.TelegramChatID, cfg.HTTPTimeout))
 	}
-	return svc, func() { _ = st.Close() }, nil
+	return svc, cfg, logger, func() { _ = st.Close() }, nil
 }
 
 func (r *runner) versionCmd(args []string) int {
@@ -827,6 +835,7 @@ const helpRU = `Release Watcher — отслеживание новых публ
   interval --global <dur>   изменить интервал по умолчанию
   remove <id> --yes         прекратить наблюдение, сохранив историю
   purge <id> --yes          удалить наблюдение и всю историю
+  mcp serve                 запустить Streamable HTTP MCP сервер
   doctor                    проверить конфигурацию и окружение
   version                   показать версию и build identity
   help                      показать эту справку
@@ -860,6 +869,7 @@ Commands:
   interval --global <dur>   change the default interval
   remove <id> --yes         stop watching and keep history
   purge <id> --yes          delete a watch and all history
+  mcp serve                 run the Streamable HTTP MCP server
   doctor                    inspect configuration and environment
   version                   show version and build identity
   help                      show this help

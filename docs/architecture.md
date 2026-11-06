@@ -16,6 +16,7 @@ internal/domain            Work, Publication, Source, Watch, Release, Event, Del
 internal/store             SQLite repositories, migrations, transactions
 internal/source            adapter registry, Narō, RSS/Atom, HTTP client and SSRF guard
 internal/notifier          outbox delivery and Telegram client
+internal/mcp               Streamable HTTP MCP server over app.Service
 internal/i18n              RU/EN user-facing strings
 internal/buildinfo         version, commit, build time, build mode
 internal/config            environment-driven configuration

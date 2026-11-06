@@ -308,6 +308,10 @@ Messages are grouped per event (a multi-chapter event becomes one message), use 
 - `backup --out <path> [--force] --json` returns `{"path":"...","schema_version":N,"bytes":N,"created_at":"..."}`. The archive contains `manifest.json` (format, schema, app version, SHA-256, size) and `release-watcher.db`.
 - `restore --in <path> --force --json` validates format, size, hash and schema compatibility, acquires the scan/notify lock and replaces the database. It returns `{"path":"...","schema_version":N,"bytes":N}`. It refuses a newer schema and requires `--force` when a database exists.
 
+## MCP integration
+
+`release-watcher mcp serve` exposes the application use cases over Streamable HTTP MCP at `/mcp`. The tool surface, auth and Hermes configuration are documented in [mcp](mcp.md). MCP tools reuse the same error codes and bounded DTOs as the CLI; they are not a second business API.
+
 ## Media Core import
 
 Media Core reads `events --json` (or a file export produced from the same contract) and stores events by `event_id`. It must not open Release Watcher's SQLite file. The two projects may run on different hosts. A repeated import of the same `event_id` is a no-op. `release_ids` are scoped to one publication; Media Core must not assume they are globally unique or that numbering is contiguous.
