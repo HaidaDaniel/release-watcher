@@ -1,0 +1,23 @@
+# Merge this block into ~/.hermes/config.yaml. Keep the rest of the file.
+# Put the token in ~/.hermes/.env as RELEASE_WATCHER_MCP_TOKEN; do not put it
+# directly in config.yaml and do not commit it.
+mcp_servers:
+  release_watcher:
+    url: "https://<PRIVATE_MCP_HOST>/mcp"
+    headers:
+      Authorization: "Bearer ${RELEASE_WATCHER_MCP_TOKEN}"
+    ssl_verify: true
+    enabled: true
+    timeout: 45
+    connect_timeout: 10
+    supports_parallel_tool_calls: false
+    tools:
+      include:
+        - list_watches
+        - get_watch
+        - list_events
+        - add_watch
+        - pause_watch
+        - resume_watch
+        - set_watch_interval
+        - remove_watch

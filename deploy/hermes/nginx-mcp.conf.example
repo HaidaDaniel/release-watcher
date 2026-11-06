@@ -1,0 +1,22 @@
+# Example only. Do not apply without a trusted certificate for the private host.
+# The MCP app itself stays on 127.0.0.1:8741 and does not terminate TLS.
+server {
+    listen 443 ssl;
+    server_name mcp.private.example;
+
+    ssl_certificate     /etc/letsencrypt/live/mcp.private.example/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mcp.private.example/privkey.pem;
+
+    client_max_body_size 1m;
+
+    location = /mcp {
+        proxy_pass http://127.0.0.1:8741/mcp;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+}

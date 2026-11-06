@@ -151,6 +151,31 @@ non-loopback Host, add that host to `RELEASE_WATCHER_MCP_ALLOWED_HOSTS`; allow
 browser origins only when a browser client is intentionally used. Do not use
 `ssl_verify: false`.
 
+## Deployed MCP service (2026-11-06)
+
+- Artifact: `0.2.0`, commit `c7f996b30d9e055ad71511307bbdd77184c667c9`,
+  linux/amd64, SHA-256 `8d15f3e0f02a6996ed45317b52dadca354e3e83dd1a73d222982c7684d8eeb7c`.
+- Service `release-watcher-mcp.service` is active as `release-watcher`, bound to
+  `127.0.0.1:8741` only. No public port was opened.
+- Effective limits: `cpu.max=25000 100000`, `memory.max=268435456`,
+  `memory.high=134217728`, `memory.swap.max=134217728`, `pids.max=64`,
+  `io.weight=default 50`. Idle RSS ~2.8 MiB, peak ~3.4 MiB, 8 tasks.
+- Token: root-owned `0600` `/etc/release-watcher/mcp.env`, generated with
+  `openssl rand -hex 32`. The token is not in Git, args, logs or MCP results.
+- Read-only mode was verified first: `tools/list` returned only
+  `list_watches`, `get_watch`, `list_events`; missing/wrong tokens returned 401.
+  Write mode was then enabled server-side; `tools/list` returned all eight
+  tools, `list_watches` returned the real NAS SQLite watch, and pause/resume
+  worked. The watch was resumed and remains enabled.
+- The daily timer stayed active. A manual `scan --due` ran while MCP was active,
+  reported `unchanged`/0 events and did not disturb the MCP process.
+- ResLedger, its scheduler and the Telegram agent remained active.
+- Remote Hermes acceptance is **blocked**: the NAS has no private HTTPS/VPN
+  endpoint and the MCP service intentionally does not terminate TLS. The
+  operator will install the Hermes client. Instructions and a token retrieval
+  command are in `deploy/hermes/README.md`; do not expose port 8741 publicly and
+  do not use `ssl_verify: false`.
+
 ## Configuration
 
 Environment variables are read at process start. Put secrets only in a protected environment file, for example `~/.config/release-watcher/env` (`0600`), and reference it from a drop-in or the service unit.

@@ -63,10 +63,11 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 
 ## Deployed
 
-- Release Watcher `0.1.0` at commit `4d08eff` is deployed system-level on a home NAS under the unprivileged `release-watcher` user. SQLite schema 3, verified backups, separate-copy restore and separate-root rollback passed. The daily timer is enabled (`OnCalendar=04:15`, `Persistent=true`); the oneshot service exits after each scan. Telegram is not configured. Whoosh was not used.
+- Release Watcher `0.2.0` at commit `c7f996b` is deployed system-level on a home NAS under the unprivileged `release-watcher` user. The daily scanner timer remains active; the new separate MCP service is active on `127.0.0.1:8741` with verified cgroup limits, read-only/write-mode checks and real SQLite reads. SQLite schema 3, verified backups, separate-copy restore and separate-root rollback passed. Telegram is not configured. Whoosh was not used.
 
 ## Blocked
 
+- Hermes remote MCP acceptance: the NAS MCP service is deployed and locally verified, but there is no private HTTPS/VPN route and the Hermes client is operator-owned. Task 0026 remains blocked pending a secure route and Hermes installation.
 - Whoosh Core live deployment: no test host; assessment documented but not executed. Task 0008 remains blocked pending a real test host and explicit deployment permission.
 
 ## APK process note
@@ -77,4 +78,4 @@ APK v0.5.2 typed 0016 as `release`, whose template asks for hosted CI, a tag and
 
 ## Next step
 
-Remaining backlog: Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), MCP stdio, and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.
+Remaining backlog: Hermes remote MCP acceptance (task 0026), Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.

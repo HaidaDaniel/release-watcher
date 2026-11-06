@@ -205,3 +205,11 @@ Architecture and dependency decisions for Release Watcher. Add a new entry for e
 - Context: Hermes runs on another machine and needs authenticated remote access without OAuth or a second database. The MCP server must not expose mutation tools by default or leak the token through logs/errors.
 - Decision: Require one static 256-bit Bearer token in `Authorization`, compare SHA-256 digests in constant time, and never accept the token in a URL or print it. `RELEASE_WATCHER_MCP_WRITE_ENABLED=false` by default: mutation tools are not registered and cannot be executed. Enforce Host/Origin allowlists, body/timeout/concurrency limits, stateless MCP sessions, mutation throttling and graceful shutdown. Ship a separate `release-watcher-mcp.service` with `release-watcher` user, loopback bind, cgroup limits and `EnvironmentFile=-/etc/release-watcher/mcp.env` (root-owned 0600). The scanner units are unchanged.
 - Consequences: Token rotation is file replacement plus service restart. Remote access still requires an existing private HTTPS/VPN route; the app does not terminate TLS. Write mode is an explicit server-side authorization boundary, not an LLM annotation.
+
+## ADR-0028 — MCP service deployed loopback-only; Hermes route operator-owned
+
+- Date: 2026-11-06
+- Status: Accepted; MCP deployed, Hermes remote acceptance blocked
+- Context: The new MCP service was deployed to the NAS with a fresh artifact, a root-owned token file and cgroup limits. The NAS audit found no private VPN or TLS reverse proxy; only plain HTTP nginx endpoints exist. The app does not terminate TLS, and the task forbids sending the Bearer token over unencrypted HTTP or using `ssl_verify: false`.
+- Decision: Keep the MCP listener on `127.0.0.1:8741` and mark remote Hermes deployment blocked until the operator provides an existing private HTTPS/VPN route or terminates TLS in a reverse proxy. Provide `deploy/hermes/` with a config template, a TLS nginx example and token-rotation instructions. Do not open a public port, do not install a new VPN/reverse proxy automatically and do not use an SSH tunnel as the production transport.
+- Consequences: Local MCP, auth, cgroups, SQLite and the scanner coexist and are verified. Hermes integration awaits the operator's secure route and client installation; task 0026 remains blocked rather than claiming a remote deployment.

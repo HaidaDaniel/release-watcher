@@ -86,3 +86,5 @@ Configure Hermes to use the remote Streamable HTTP MCP endpoint over a private T
 ## Notes
 
 - Do not use ssl_verify=false. Do not expose the MCP port to the public internet. Do not overwrite the whole Hermes config. Do not use production Telegram.
+- deployed 2026-11-06: MCP 0.2.0 at commit `c7f996b30d9e055ad71511307bbdd77184c667c9`, SHA-256 `8d15f3e0f02a6996ed45317b52dadca354e3e83dd1a73d222982c7684d8eeb7c`, installed on the NAS. `release-watcher-mcp.service` is active as `release-watcher` on `127.0.0.1:8741`, cgroup limits verified, token in root-owned `0600` `/etc/release-watcher/mcp.env`, write mode enabled after read-only checks. Local MCP auth/tools/SQLite checks passed; the daily scanner and existing services stayed active.
+- blocked: remote Hermes acceptance requires a private HTTPS/VPN route (none exists on the NAS) and the operator-owned Hermes client. The MCP port is not public and `ssl_verify: false` is forbidden. Instructions are in `deploy/hermes/README.md`; the token is retrieved with `sudo cat /etc/release-watcher/mcp.env` on the NAS, not from Git or chat.
