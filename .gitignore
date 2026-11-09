@@ -70,3 +70,4 @@ node_modules/
 .apk-workspaces/
 docs/audit-report.md
 docs/project-map.md
+/tmp/apk/
