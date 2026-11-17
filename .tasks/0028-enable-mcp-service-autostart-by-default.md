@@ -1,6 +1,6 @@
 # Task 0028 - Enable MCP service autostart by default in the system installer
 
-State: doing
+State: done
 Owner: opencode-primary-hy4
 Mode: mvp
 Lane: implementation
