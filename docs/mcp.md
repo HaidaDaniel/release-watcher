@@ -86,3 +86,11 @@ mcp_servers:
 Store the token in Hermes' protected `.env`/secret scope, not in `config.yaml`.
 Do not use `ssl_verify: false`. Remote deployment requires a private HTTPS/VPN
 route; the default server binds loopback only.
+
+## Systemd autostart
+
+On system-level deployments `install-system.sh` enables and starts
+`release-watcher-mcp.service` by default and creates the root-owned `0600`
+`/etc/release-watcher/mcp.env` on first install. An existing token file is not
+rotated; use `scripts/install-mcp-env.sh --force` to rotate it and restart the
+service. The scanner timer is deliberately not enabled by the installer.

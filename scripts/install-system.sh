@@ -9,7 +9,8 @@ usage() {
 usage: install-system.sh --artifact PATH --manifest PATH [--units-dir DIR] [--keep 5]
 
 Installs only Release Watcher paths and units. Paths and the runtime user are
-fixed to match deploy/systemd/system. It does not enable the timer.
+fixed to match deploy/systemd/system. It enables the MCP service but not the
+scanner timer.
 USAGE
   exit 2
 }
@@ -46,6 +47,7 @@ fi
 }
 command -v python3 >/dev/null || { echo 'install-system: python3 is required for manifest validation' >&2; exit 1; }
 command -v systemd-analyze >/dev/null || { echo 'install-system: systemd-analyze is required' >&2; exit 1; }
+command -v openssl >/dev/null || { echo 'install-system: openssl is required to generate the MCP token' >&2; exit 1; }
 
 read -r commit version goarch <<<"$(python3 - "$manifest" "$artifact" <<'PY'
 import hashlib, json, os, sys
@@ -111,6 +113,8 @@ previous_current=""
 previous_service=0
 previous_timer=0
 previous_mcp=0
+previous_mcp_enabled=0
+mcp_enable_changed=0
 units_changed=0
 current_changed=0
 release_dir="$root/releases/$commit"
@@ -136,6 +140,13 @@ cleanup() {
         rm -f /etc/systemd/system/release-watcher-mcp.service
       fi
       systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    if [[ $mcp_enable_changed -eq 1 ]]; then
+      if [[ $previous_mcp_enabled -eq 1 ]]; then
+        systemctl enable release-watcher-mcp.service >/dev/null 2>&1 || true
+      else
+        systemctl disable release-watcher-mcp.service >/dev/null 2>&1 || true
+      fi
     fi
     if [[ $current_changed -eq 1 ]]; then
       if [[ -n $previous_current ]]; then
@@ -186,6 +197,9 @@ if [[ -f /etc/systemd/system/release-watcher-mcp.service ]]; then
   cp -a /etc/systemd/system/release-watcher-mcp.service "$backup_dir/release-watcher-mcp.service"
   previous_mcp=1
 fi
+if systemctl is-enabled --quiet release-watcher-mcp.service 2>/dev/null; then
+  previous_mcp_enabled=1
+fi
 
 tmp_link="$root/.current.$$"
 ln -sfn "$release_dir" "$tmp_link"
@@ -198,6 +212,33 @@ install -m 0644 -o root -g root "$units_dir/release-watcher.timer" /etc/systemd/
 install -m 0644 -o root -g root "$units_dir/release-watcher-mcp.service" /etc/systemd/system/release-watcher-mcp.service
 systemctl daemon-reload
 systemd-analyze verify /etc/systemd/system/release-watcher.service /etc/systemd/system/release-watcher.timer /etc/systemd/system/release-watcher-mcp.service
+
+# The MCP service is part of every deployment and must come back after a
+# reboot. It cannot start without a token, so bootstrap a read-only loopback
+# env on first install; an existing token is never rotated here.
+if [[ ! -e /etc/release-watcher/mcp.env ]]; then
+  (
+    umask 077
+    token=$(openssl rand -hex 32)
+    tmp_env=$(mktemp /etc/release-watcher/.mcp.env.XXXXXX)
+    trap 'rm -f "$tmp_env"' EXIT
+    cat >"$tmp_env" <<ENV
+# Release Watcher MCP secret. Root-owned, read by the systemd manager.
+RELEASE_WATCHER_MCP_TOKEN=$token
+RELEASE_WATCHER_MCP_LISTEN=127.0.0.1:8741
+RELEASE_WATCHER_MCP_WRITE_ENABLED=false
+# Add the reverse-proxy hostname when MCP is reached through HTTPS.
+RELEASE_WATCHER_MCP_ALLOWED_HOSTS=
+RELEASE_WATCHER_MCP_ALLOWED_ORIGINS=
+ENV
+    chown root:root "$tmp_env"
+    chmod 0600 "$tmp_env"
+    mv -f "$tmp_env" /etc/release-watcher/mcp.env
+    trap - EXIT
+  )
+fi
+mcp_enable_changed=1
+systemctl enable --now release-watcher-mcp.service
 
 # Keep the newest releases, but never remove the current target. Pruning is
 # best-effort: a pruning failure must not roll back a successful install.
@@ -221,7 +262,9 @@ fi
 
 echo "install-system: installed $commit ($version) at $release_dir"
 echo "install-system: current -> $root/current"
-echo "install-system: timer and MCP service are NOT enabled"
+echo "install-system: MCP service is enabled and started (loopback, read-only)"
+echo "install-system: timer is NOT enabled"
 echo "Next: systemctl start release-watcher.service   # smoke"
 echo "Then: systemctl enable --now release-watcher.timer"
-echo "MCP:  sudo scripts/install-mcp-env.sh [--write-enabled], then start release-watcher-mcp.service"
+echo "MCP config: /etc/release-watcher/mcp.env (root-only)"
+echo "Rotate: sudo scripts/install-mcp-env.sh --force, then restart release-watcher-mcp.service"

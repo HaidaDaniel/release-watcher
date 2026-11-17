@@ -84,12 +84,13 @@ On the NAS, as root, install without enabling the timer:
 ```sh
 sudo scripts/install-system.sh --artifact release-watcher-linux-amd64 \
   --manifest manifest.json --units-dir deploy/systemd/system
+# MCP is enabled and started by the installer; only the scanner stays manual:
 sudo systemctl start release-watcher.service   # smoke
 # after smoke:
 sudo systemctl enable --now release-watcher.timer
 ```
 
-`install-system.sh` validates the manifest/checksum/architecture, stages the binary, verifies its build identity and verifies the units with `systemd-analyze` before switching `current`. It backs up the previous `current` symlink and unit files; any later install failure restores them. It creates only Release Watcher paths and user, installs the units, switches `current` atomically and keeps the newest `--keep` releases (default 5, minimum 2, never the current target). It does not start or enable the timer. `rollback-system.sh --commit <sha>` switches back to an installed release and verifies its build identity; if the database schema changed, restore a compatible pre-upgrade backup first. Backups are not pruned by the installer. Use `scripts/prune-backups.sh --dir /var/backups/release-watcher --keep 7 --verified <last-verified.rwbackup>` (dry-run by default; add `--apply`) so the last verified backup is never deleted.
+`install-system.sh` validates the manifest/checksum/architecture, stages the binary, verifies its build identity and verifies the units with `systemd-analyze` before switching `current`. It backs up the previous `current` symlink and unit files; any later install failure restores them. It creates only Release Watcher paths and user, installs the units, switches `current` atomically and keeps the newest `--keep` releases (default 5, minimum 2, never the current target). On first install it generates `/etc/release-watcher/mcp.env` (fresh 256-bit token, loopback bind, read-only mode, root-owned `0600`) and enables and starts `release-watcher-mcp.service`, so MCP survives a reboot without a separate command. An existing `mcp.env` is never overwritten or rotated by the installer. A failed install restores the previous MCP enable state as well as the previous units and `current`. It does not start or enable the scanner timer. `rollback-system.sh --commit <sha>` switches back to an installed release and verifies its build identity; if the database schema changed, restore a compatible pre-upgrade backup first. Backups are not pruned by the installer. Use `scripts/prune-backups.sh --dir /var/backups/release-watcher --keep 7 --verified <last-verified.rwbackup>` (dry-run by default; add `--apply`) so the last verified backup is never deleted.
 
 ### Whoosh Core assessment for prebuilt artifacts
 
@@ -110,7 +111,7 @@ Whoosh Core (inspected commit `24d8dc398e2d7baacf13338e44197ba0d471dde3`) is Git
 - Telegram: `NOT_CONFIGURED`; no messages were sent.
 - The smoke watch was created with a short interval to force a due scan, then changed to the default 24h. `doctor` reports `system timer cadence 24h0m0s covers the shortest enabled watch interval 24h0m0s`.
 
-## MCP service (prepared, not installed by default)
+## MCP service (enabled by default on system installs)
 
 The MCP server is a separate system-level oneshot-independent service:
 
@@ -132,14 +133,18 @@ The MCP server is a separate system-level oneshot-independent service:
 - Restart: `on-failure`, 5 s delay, 5-start burst limit.
 - The service uses the existing SQLite state; it never opens a second database.
 
-Create the token file as root. The script generates `openssl rand -hex 32`
-(256 bits) and never prints it:
+`install-system.sh` creates this token file on first install and enables the
+service automatically. To rotate the token or enable write mode, run the helper
+as root. It generates `openssl rand -hex 32` (256 bits) and never prints it:
 
 ```sh
-sudo scripts/install-mcp-env.sh             # read-only MCP
-sudo scripts/install-mcp-env.sh --write-enabled
 sudo scripts/install-mcp-env.sh --force     # rotate token
+sudo scripts/install-mcp-env.sh --write-enabled
+sudo systemctl restart release-watcher-mcp.service
 ```
+
+`install-mcp-env.sh` without `--force` creates the file only when it is absent,
+so it is safe on older deployments where the installer did not yet bootstrap it.
 
 `mcp.env` is root-owned `0600`. The token is read by the systemd manager, not
 passed in command-line arguments and not stored in a release directory. Copy
@@ -180,6 +185,18 @@ browser origins only when a browser client is intentionally used. Do not use
   the operator installing the Hermes client and trusting the CA**. Instructions
   and a token retrieval command are in `deploy/hermes/README.md`; do not expose
   port 8741/8742 publicly and do not use `ssl_verify: false`.
+
+## MCP autostart fix (2026-11-17)
+
+The 2026-11-06 deployment installed the MCP unit but never enabled it, so the
+service stayed `disabled`/inactive after the 17.11 reboot. `install-system.sh`
+now bootstraps `mcp.env` on first install and runs
+`systemctl enable --now release-watcher-mcp.service` on every system install;
+a failed install restores the previous enable state. This is a repository fix
+only: run the installer again on the NAS, or at minimum run
+`sudo systemctl enable --now release-watcher-mcp.service`, to make the live host
+survive future reboots. Also review `/etc/release-watcher/environment`: Telegram
+is commented out there, so no new-chapter notifications are sent.
 
 ## Configuration
 

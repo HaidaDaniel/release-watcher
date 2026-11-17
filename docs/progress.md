@@ -39,6 +39,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - `remove` cancels that watch's pending/failed deliveries atomically; canceled deliveries never send after restart or re-add, while pause does not cancel.
 - Live Narō smoke and isolated E2E regression are implemented and pass.
 - Media Core documentation is complete in its separate repository (docs only).
+- System installer bootstraps the MCP token on first install and enables/starts `release-watcher-mcp.service` on every deployment; the scanner timer remains manual. The live NAS still needs a redeploy. Task 0028.
 
 ## Tested
 
@@ -61,6 +62,7 @@ Status vocabulary: `planned`, `implemented`, `tested`, `deployed`, `blocked`. Do
 - NAS deployment acceptance: system-level install, effective cgroup limits (`cpu.max=40000 100000`, memory/swap/pids/io), SQLite persistence, service run, daily timer, backup/restore on a separate copy, upgrade from `1d89864` to `4d08eff` on a restored test DB and rollback on a separate test root: see task 0022 evidence.
 - MCP deployment: `0.2.0`/`c7f996b` installed, loopback-only service active, effective cgroup limits and auth/tools verified; rollback `c7f996b`->`4d08eff` verified on a separate root. See task 0026 evidence and `deploy/hermes/README.md`.
 - Signal/timeout/lock acceptance: a second concurrent scan exits 4 with a JSON `locked` error; SIGINT ends the scan with a partial-failure JSON envelope and exit 3; an external timeout terminates the process; a later run succeeds.
+- Installer MCP autostart regression: the installer token bootstrap, enable command, their order, the root-owned `0600` mode and rollback of previous enable state are checked by `tests/install`: see task 0028 evidence.
 
 ## Deployed
 
@@ -79,4 +81,4 @@ APK v0.5.2 typed 0016 as `release`, whose template asks for hosted CI, a tag and
 
 ## Next step
 
-Remaining backlog: Hermes remote MCP acceptance (task 0026), Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.
+Remaining backlog: redeploy on the NAS so MCP autostart takes effect (task 0028 repository fix is local only), Hermes remote MCP acceptance (task 0026), Whoosh Core deployment spike (task 0008), Whoosh vs ResLedger comparison (task 0009), and future sources/content delivery. Media Core documentation is complete in its separate repository. See docs/roadmap.md.

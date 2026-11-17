@@ -373,3 +373,38 @@ func TestSystemInstallerVerifiesBeforeSwitchAndHasRollback(t *testing.T) {
 		}
 	}
 }
+
+func TestSystemInstallerEnablesMcpServiceByDefault(t *testing.T) {
+	root := repoRoot(t)
+	script, err := os.ReadFile(filepath.Join(root, "scripts", "install-system.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	for _, want := range []string{
+		"command -v openssl",
+		"if [[ ! -e /etc/release-watcher/mcp.env ]]; then",
+		"RELEASE_WATCHER_MCP_TOKEN=$token",
+		"RELEASE_WATCHER_MCP_WRITE_ENABLED=false",
+		"chmod 0600 \"$tmp_env\"",
+		"systemctl enable --now release-watcher-mcp.service",
+		"previous_mcp_enabled=1",
+		"systemctl disable release-watcher-mcp.service",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("installer MCP autostart missing %q", want)
+		}
+	}
+	envIdx := strings.Index(text, "RELEASE_WATCHER_MCP_TOKEN=$token")
+	enableIdx := strings.Index(text, "systemctl enable --now release-watcher-mcp.service")
+	if envIdx < 0 || enableIdx < 0 || envIdx > enableIdx {
+		t.Fatal("installer must bootstrap the MCP token before enabling the service")
+	}
+	mcp, err := os.ReadFile(filepath.Join(root, "deploy", "systemd", "system", "release-watcher-mcp.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(mcp), "WantedBy=multi-user.target") {
+		t.Fatal("MCP unit is not enableable")
+	}
+}
